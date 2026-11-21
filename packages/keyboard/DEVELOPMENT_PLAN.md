@@ -164,13 +164,13 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement normalized state storage and the finalized visibility/out-of-range policy.
-- [ ] Expose `setPressedKeys`, `pressKey`, `releaseKey`, `clearPressedKeys`, `getPressedKeys` with note-name/MIDI inputs and documented ordering.
-- [ ] Implement state-to-scene styling for visible keys; update only affected DOM elements where structural changes are unnecessary.
-- [ ] Support simultaneous notes, duplicates, repeated operations, and range/orientation changes without accidental state loss.
-- [ ] Test targeted DOM updates, state independence from skins, invalid note inputs, range changes, and repeated cleanup.
+- [x] Implement normalized state storage and the finalized visibility/out-of-range policy.
+- [x] Expose `setPressedKeys`, `pressKey`, `releaseKey`, `clearPressedKeys`, `getPressedKeys` with note-name/MIDI inputs and documented ordering.
+- [x] Implement state-to-scene styling for visible keys; update only affected DOM elements where structural changes are unnecessary.
+- [x] Support simultaneous notes, duplicates, repeated operations, and range/orientation changes without accidental state loss.
+- [x] Test targeted DOM updates, DOM-independent state storage, invalid note inputs, range changes, and repeated cleanup. Phase 5 covers preservation during actual skin switching.
 
-**Gate:** State APIs match specification; visual updates do not reconstruct the keyboard for key-only changes; state invariants survive layout operations.
+**Gate passed.** The visual state API preserves canonical note identity through layout changes. Mutation and identity tests confirm that state-only commands update only affected SVG attributes. The Node scene, SVG parity and Firefox demo checks passed. [Verification evidence](PROJECT_STATE.md#phase-4-verification)
 
 ## 10. Phase 5 — Skins and configurable appearance
 

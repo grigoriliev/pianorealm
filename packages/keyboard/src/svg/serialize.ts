@@ -1,5 +1,7 @@
 import type { KeyboardScene } from '../scene/build-scene.js';
-import { backgroundAttributes, keyAttributes, rootAttributes, SVG_NS, viewportAttributes } from './attributes.js';
+import {
+  backgroundAttributes, indicatorAttributes, keyAttributes, rootAttributes, SVG_NS, viewportAttributes,
+} from './attributes.js';
 import type { Viewport } from './attributes.js';
 
 function encodeAttribute(value: string | number): string {
@@ -24,5 +26,6 @@ export function serializeScene(scene: KeyboardScene, viewport: Viewport = scene)
   const root = { xmlns: SVG_NS, ...viewportAttributes(viewport), ...rootAttributes(scene) };
   const background = `<rect${serializeAttributes(backgroundAttributes(scene))}/>`;
   const keys = scene.keys.map(key => `<rect${serializeAttributes(keyAttributes(key))}/>`).join('');
-  return `<svg${serializeAttributes(root)}>${background}${keys}</svg>`;
+  const indicators = scene.keys.map(key => `<circle${serializeAttributes(indicatorAttributes(key))}/>`).join('');
+  return `<svg${serializeAttributes(root)}>${background}${keys}${indicators}</svg>`;
 }

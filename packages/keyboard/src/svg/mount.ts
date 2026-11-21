@@ -1,6 +1,7 @@
+import { keyPresentation, minimalAppearance } from '../scene/build-scene.js';
 import type { KeyboardScene } from '../scene/build-scene.js';
 import type { Viewport } from './attributes.js';
-import { buildSvg, sizeSvg } from './dom-renderer.js';
+import { buildSvg, sizeSvg, updateKeyPresentation } from './dom-renderer.js';
 import { measureContainer } from './measure.js';
 
 interface MountSizing {
@@ -25,8 +26,8 @@ export class MountedSvg {
   readonly #sizing: MountSizing;
   readonly #slot: HTMLElement;
   #observer?: ResizeObserver;
-  #root: SVGSVGElement;
-  #scene: KeyboardScene;
+  #drawing: ReturnType<typeof buildSvg>;
+  #intrinsicSize: Viewport;
   #viewport: Viewport | null = null;
   #active = false;
 
@@ -37,9 +38,9 @@ export class MountedSvg {
 
     this.#container = container;
     this.#sizing = sizing;
-    this.#scene = scene;
+    this.#intrinsicSize = { width: scene.width, height: scene.height };
     const document = container.ownerDocument;
-    this.#root = buildSvg(document, scene);
+    this.#drawing = buildSvg(document, scene);
     this.#slot = container;
     if (sizing.mode === 'container') {
       // Keep the rendered SVG out of host sizing so it cannot sustain a stale height
@@ -47,7 +48,7 @@ export class MountedSvg {
       this.#slot = document.createElement('div');
       this.#slot.style.cssText = 'position:relative;display:block;width:0;height:0';
     }
-    this.#position(this.#root);
+    this.#position(this.#drawing.root);
 
     Object.defineProperty(container, mountOwner, { value: true, configurable: true });
     this.#active = true;
@@ -75,46 +76,54 @@ export class MountedSvg {
     }
   }
 
-  #measure(scene: KeyboardScene): Viewport | null {
+  #measure(intrinsicSize: Viewport): Viewport | null {
     if (this.#sizing.mode === 'container') {
       return measureContainer(this.#container);
     }
     return {
-      width: this.#sizing.width ?? scene.width,
-      height: this.#sizing.height ?? scene.height,
+      width: this.#sizing.width ?? intrinsicSize.width,
+      height: this.#sizing.height ?? intrinsicSize.height,
     };
   }
 
   replace(scene: KeyboardScene): void {
-    const root = buildSvg(this.#container.ownerDocument, scene);
+    const drawing = buildSvg(this.#container.ownerDocument, scene);
+    const { root } = drawing;
+    const previousRoot = this.#drawing.root;
     this.#position(root);
     const viewport = this.#measure(scene);
     if (viewport) {
       sizeSvg(root, viewport);
-      if (this.#root.parentNode === this.#slot) {
-        this.#slot.replaceChild(root, this.#root);
+      if (previousRoot.parentNode === this.#slot) {
+        this.#slot.replaceChild(root, previousRoot);
       } else {
         this.#slot.appendChild(root);
       }
     } else {
-      this.#root.remove();
+      previousRoot.remove();
     }
 
-    this.#root = root;
-    this.#scene = scene;
+    this.#drawing = drawing;
+    this.#intrinsicSize = { width: scene.width, height: scene.height };
     this.#viewport = viewport;
   }
 
+  setKeyPressed(note: number, pressed: boolean): void {
+    const nodes = this.#drawing.keys.get(note);
+    if (nodes) updateKeyPresentation(nodes, keyPresentation(nodes.kind, minimalAppearance, pressed));
+  }
+
   resize(): void {
-    const viewport = this.#measure(this.#scene);
+    const viewport = this.#measure(this.#intrinsicSize);
+    const { root } = this.#drawing;
     if (!viewport) {
-      this.#root.remove();
+      root.remove();
     } else {
       if (viewport.width !== this.#viewport?.width || viewport.height !== this.#viewport?.height) {
-        sizeSvg(this.#root, viewport);
+        sizeSvg(root, viewport);
       }
-      if (this.#root.parentNode !== this.#slot) {
-        this.#slot.appendChild(this.#root);
+      if (root.parentNode !== this.#slot) {
+        this.#slot.appendChild(root);
       }
     }
     this.#viewport = viewport;
@@ -125,7 +134,8 @@ export class MountedSvg {
     try {
       this.#observer?.disconnect();
     } finally {
-      this.#root.remove();
+      this.#drawing.root.remove();
+      this.#drawing.keys.clear();
       if (this.#slot !== this.#container) this.#slot.remove();
       Reflect.deleteProperty(this.#container, mountOwner);
     }

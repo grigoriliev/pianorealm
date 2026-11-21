@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PianoKeyboard } from '../../src/index.js';
-import type { KeyboardOptions } from '../../src/index.js';
+import type { KeyboardOptions, NoteInput } from '../../src/index.js';
 import { calculateLayout } from '../../src/geometry/layout.js';
 import { normalizeConfig } from '../../src/config/normalize.js';
 import { buildScene, minimalAppearance } from '../../src/scene/build-scene.js';
@@ -222,6 +222,181 @@ describe('mounted keyboard', () => {
   });
 });
 
+describe('programmatic pressed keys', () => {
+  function key(root: Element, note: number): Element {
+    return root.querySelector(`[data-note="${note}"]`)!;
+  }
+
+  function visiblePressed(root: Element): number[] {
+    return Array.from(root.querySelectorAll(`[data-note][fill="${minimalAppearance.pressed}"]`),
+      element => Number(element.getAttribute('data-note'))).sort((a, b) => a - b);
+  }
+
+  function watchChanges(host: Element) {
+    const observer = new dom.window.MutationObserver(() => {});
+    observer.observe(host, { childList: true, attributes: true, subtree: true });
+    return observer;
+  }
+
+  it('changes only the corresponding key bodies and indicators, keeping every node and its geometry', () => {
+    const piano = mount({ sizing: { mode: 'fixed' }, range: { from: 60, to: 67 } });
+    const root = svg();
+    const children = Array.from(root.children);
+    const bodies = Array.from(root.querySelectorAll('[data-note]'));
+    const indicators = root.querySelectorAll('circle');
+    const observer = watchChanges(container);
+
+    function expectChanges(...changed: number[]) {
+      const records = observer.takeRecords();
+      expect(records.map(({ attributeName }) => attributeName))
+        .toEqual(changed.flatMap(() => ['fill', 'display']));
+      changed.forEach((note, index) => {
+        const body = key(root, note);
+        expect(records[index * 2].target).toBe(body);
+        expect(records[index * 2 + 1].target).toBe(indicators[bodies.indexOf(body)]);
+      });
+      expect(svg()).toBe(root);
+      expect(root.children).toHaveLength(children.length);
+      children.forEach((child, index) => expect(root.children[index]).toBe(child));
+      expect(root.querySelectorAll('circle[display="inline"]')).toHaveLength(visiblePressed(root).length);
+    }
+
+    expect(piano.getPressedKeys()).toEqual([]);
+    piano.pressKey('C4');
+    expect(visiblePressed(root)).toEqual([60]);
+    expectChanges(60);
+    piano.pressKey('B#3');
+    piano.releaseKey(61);
+    expectChanges();
+
+    piano.setPressedKeys(['G4', 'B#3', 64, 'E4', 60]);
+    expect(visiblePressed(root)).toEqual([60, 64, 67]);
+    expect(piano.getPressedKeys()).toEqual([60, 64, 67]);
+    piano.getPressedKeys().pop();
+    expectChanges(67, 64);
+    piano.setPressedKeys([64, 'C4', 67]);
+    expectChanges();
+
+    piano.setPressedKeys([60, 'Db4', 67]);
+    expect(key(root, 64).getAttribute('fill')).toBe(minimalAppearance.white);
+    expect(visiblePressed(root)).toEqual([60, 61, 67]);
+    expectChanges(64, 61);
+    piano.releaseKey('C#4');
+    expect(key(root, 61).getAttribute('fill')).toBe(minimalAppearance.black);
+    expectChanges(61);
+    piano.clearPressedKeys();
+    expect(visiblePressed(root)).toEqual([]);
+    expect(piano.getPressedKeys()).toEqual([]);
+    expectChanges(60, 67);
+    piano.clearPressedKeys();
+    expectChanges();
+    observer.disconnect();
+  });
+
+  it('retains off-range notes without DOM writes and restores them through range, orientation and resize changes', () => {
+    setContentSize(100, 100);
+    const piano = mount({ range: { from: 60, to: 61 }, notation: { octaveOffset: 1 } });
+    const root = svg();
+    const observer = watchChanges(container);
+    piano.pressKey(127);
+    piano.pressKey(0);
+    piano.pressKey('E5');
+    expect(piano.getPressedKeys()).toEqual([0, 64, 127]);
+    expect(observer.takeRecords()).toEqual([]);
+    piano.pressKey('C5');
+    expect(visiblePressed(root)).toEqual([60]);
+    observer.takeRecords();
+    piano.setPressedKeys([127, 64, 60]);
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+
+    piano.setRange('E5', 'E5');
+    expect(visiblePressed(svg())).toEqual([64]);
+    piano.setOrientation('vertical');
+    const vertical = svg();
+    expect(vertical.getAttribute('viewBox')).toBe('0 0 100 20');
+    expect(visiblePressed(vertical)).toEqual([64]);
+    setContentSize(220, 100);
+    piano.resize();
+    expect(svg()).toBe(vertical);
+    expect(vertical.getAttribute('width')).toBe('220');
+    expect(visiblePressed(vertical)).toEqual([64]);
+    setContentSize(220, 0);
+    piano.resize();
+    expect(svg()).toBeNull();
+    piano.releaseKey('E5');
+    setContentSize(220, 100);
+    piano.resize();
+    expect(svg()).toBe(vertical);
+    expect(visiblePressed(svg())).toEqual([]);
+
+    piano.setRange(60, 127);
+    expect(visiblePressed(svg())).toEqual([60, 127]);
+    piano.setOrientation('horizontal');
+    expect(visiblePressed(svg())).toEqual([60, 127]);
+    expect(piano.getPressedKeys()).toEqual([60, 127]);
+  });
+
+  it('rejects invalid notes and batches before changing logical or visual state', () => {
+    const piano = mount({ sizing: { mode: 'fixed' } });
+    piano.setPressedKeys([60, 61]);
+    const root = svg();
+    const before = root.outerHTML;
+    const observer = watchChanges(container);
+
+    const invalidNotes = [
+      ['H4', TypeError], ['60', TypeError], [null, TypeError], [true, TypeError], [{}, TypeError],
+      [NaN, RangeError], [Infinity, RangeError], [60.5, RangeError], [-1, RangeError],
+      [128, RangeError], ['C-2', RangeError],
+    ] as const;
+    for (const [value, error] of invalidNotes) {
+      const note = value as NoteInput;
+      expect(() => piano.pressKey(note)).toThrow(error);
+      expect(() => piano.releaseKey(note)).toThrow(error);
+      expect(() => piano.setPressedKeys([67, note])).toThrow(error);
+    }
+    for (const collection of ['C4', new Set([60]), { 0: 60, length: 1 }, null, undefined]) {
+      expect(() => piano.setPressedKeys(collection as unknown as readonly NoteInput[])).toThrow(TypeError);
+    }
+    expect(() => piano.setPressedKeys(Array<NoteInput>(2))).toThrow(TypeError);
+    expect(piano.getPressedKeys()).toEqual([60, 61]);
+    expect(svg()).toBe(root);
+    expect(root.outerHTML).toBe(before);
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+  });
+
+  it('keeps instance registries independent and enforces lifecycle on every state method', () => {
+    const options = { sizing: { mode: 'fixed' } } as const;
+    const other = dom.window.document.getElementById('other')!;
+    const first = mount(options);
+    const second = mount(options, other);
+    const otherRoot = svg(other);
+    const observer = watchChanges(other);
+
+    first.pressKey(60);
+    expect(visiblePressed(otherRoot)).toEqual([]);
+    expect(observer.takeRecords()).toEqual([]);
+    second.pressKey(61);
+    expect(visiblePressed(svg())).toEqual([60]);
+    first.destroy();
+    first.destroy();
+    for (const operation of [
+      () => first.pressKey(61), () => first.releaseKey(60), () => first.setPressedKeys([62]),
+      () => first.clearPressedKeys(), () => first.getPressedKeys(),
+    ]) {
+      expect(operation).toThrow(/destroyed/);
+    }
+    const remounted = mount(options);
+    expect(remounted.getPressedKeys()).toEqual([]);
+    expect(visiblePressed(svg())).toEqual([]);
+    expect(second.getPressedKeys()).toEqual([61]);
+    expect(svg(other)).toBe(otherRoot);
+    expect(visiblePressed(otherRoot)).toEqual([61]);
+    observer.disconnect();
+  });
+});
+
 describe('static parity', () => {
   it.each([
     { from: 60, to: 71, orientation: 'horizontal' },
@@ -229,7 +404,7 @@ describe('static parity', () => {
     { from: 61, to: 61, orientation: 'vertical' },
   ] as const)('matches the scene and mounted SVG for $from–$to, $orientation', ({ from, to, orientation }) => {
     const options = { range: { from, to }, orientation, sizing: { mode: 'fixed', height: 135 } } as const;
-    mount(options);
+    const piano = mount(options);
     const config = normalizeConfig(options);
     const layout = calculateLayout(config.range, config.orientation, config.sizing);
     const scene = buildScene(config, layout, minimalAppearance);
@@ -248,6 +423,15 @@ describe('static parity', () => {
     expect(notes(staticSvg)).toEqual(layout.keys.map(key => String(key.note)));
     expect(staticSvg.querySelector('[id], style, script, [href], [tabindex]')).toBeNull();
     expect(domSvg.querySelector('[id], style, script, [href], [tabindex]')).toBeNull();
+
+    piano.setPressedKeys([0, 61, 62]);
+    const pressedScene = buildScene(config, layout, minimalAppearance, new Set(piano.getPressedKeys()));
+    const pressedSvg = new dom.window.DOMParser().parseFromString(
+      serializeScene(pressedScene, { width: scene.width, height: 135 }), 'image/svg+xml',
+    ).documentElement;
+    expect(Array.from(pressedSvg.children, attributes)).toEqual(Array.from(domSvg.children, attributes));
+    expect(notes(pressedSvg)).toEqual(notes(staticSvg));
+    expect(pressedSvg.querySelectorAll('circle[display="inline"]')).toHaveLength(from === to ? 1 : 2);
   });
 
   it('escapes XML attribute values and rejects invalid XML code points', () => {

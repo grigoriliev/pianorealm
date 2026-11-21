@@ -171,11 +171,11 @@ Keep these domains distinct:
 
 Do not store independent, contradictory copies of the same property. Layout and visual scene are **derived** from configuration and state.
 
-### 4.3 Pressed-state semantics — decision required
+### 4.3 Pressed-state semantics
 
-The specification requires predictable behavior for notes outside the displayed range, but does **not** prescribe whether they remain in logical state. **Proposed default:** retain valid MIDI pressed notes in the logical set; render only those inside the current range. This makes range changes non-destructive and supports external MIDI-driven visualization. Finalize and document this before Phase 4.
+The controller normalizes note inputs using the notation in effect at ingestion. The state store retains canonical MIDI notes across visual configuration changes, including notes outside the displayed range. The scene renders the visible intersection. [A-05](docs/decisions/0001-notes-configuration-and-state.md)
 
-`setPressedKeys` should normalize, deduplicate, and compare sets; `getPressedKeys` should return a new, deterministically ordered array (proposed: ascending MIDI). Repeating an already-applied action should have no visible effect. Decide whether no-op operations emit events before finalizing the event API.
+`setPressedKeys` validates and deduplicates the full array before replacing the selection. `getPressedKeys` returns a detached ascending MIDI array. Equivalent selections produce no DOM mutations. Phase 4 updates the fill and fixed dot of each changed visible key through an instance-local MIDI map. The state methods follow the mounted lifecycle contract and throw after destruction. [Lifecycle ADR](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
 
 ## 5. Note parsing and range validation
 
@@ -328,7 +328,7 @@ Baseline instance API required by the specification:
 ```ts
 class PianoKeyboard {
   constructor(options: KeyboardOptions);
-  setPressedKeys(keys: NoteInput[]): void;
+  setPressedKeys(keys: readonly NoteInput[]): void;
   pressKey(key: NoteInput): void;
   releaseKey(key: NoteInput): void;
   clearPressedKeys(): void;

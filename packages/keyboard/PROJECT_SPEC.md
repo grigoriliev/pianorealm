@@ -160,14 +160,14 @@ Requirements:
 Provide a state API including:
 
 ```ts
-setPressedKeys(keys: NoteInput[]): void;
+setPressedKeys(keys: readonly NoteInput[]): void;
 pressKey(key: NoteInput): void;
 releaseKey(key: NoteInput): void;
 clearPressedKeys(): void;
 getPressedKeys(): number[];
 ```
 
-`NoteInput` represents a valid MIDI number or supported note name. Implement stable normalization, deduplication and predictable return ordering. Decide and document whether out-of-range notes remain in logical state or are discarded; do not allow skin/orientation/resize changes to silently mutate that policy.
+`NoteInput` represents a valid MIDI number or supported note name. Validate and deduplicate the full batch before replacing the selection. Return a detached array in ascending MIDI order. Retain valid off-range notes in logical state and render the visible intersection. Preserve canonical MIDI identities across range, notation, skin, orientation and size changes. [A-05](docs/decisions/0001-notes-configuration-and-state.md)
 
 Required visualization modes:
 

@@ -5,13 +5,13 @@
 Pianorealm is an open-source, framework-independent JavaScript and TypeScript ecosystem for piano visualization, interaction, MIDI connectivity, and audio. Its goal is to let developers combine only the capabilities they need—from a static keyboard diagram in a flashcard to a playable, MIDI-connected application.
 
 > [!IMPORTANT]
-> **Early development.** The keyboard package has a local ESM build with note utilities and a Minimal SVG keyboard for browser mounting. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
+> **Early development.** The keyboard package has a local ESM build with note utilities, a mounted Minimal SVG keyboard, and programmatic pressed-key highlights. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
 
 ## Packages
 
 | Package | Responsibility | Status |
 | --- | --- | --- |
-| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | Phase 3 complete. Mounted SVG in both orientations, configurable range, viewport fitting, and a private static SVG prototype. |
+| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | Phase 4 complete. Programmatic pressed-key state, mounted SVG in both orientations, configurable range, viewport fitting, and a private static SVG prototype. |
 | **`@pianorealm/interaction`** | Pointer, mouse, touch, and computer-keyboard input | Planned |
 | **`@pianorealm/midi`** | MIDI input/output and device integration | Planned |
 | **`@pianorealm/audio`** | Audio generation and playback | Planned |
@@ -50,7 +50,7 @@ See the [keyboard specification](packages/keyboard/PROJECT_SPEC.md), [package ar
 
 The [keyboard project state](packages/keyboard/PROJECT_STATE.md) is the authoritative record of what has actually been completed and verified.
 
-Phase 3 delivered the shared scene and mounted SVG. Phase 4 will add programmatic pressed-key visualization.
+Phase 4 delivered programmatic pressed-key visualization. Phase 5 covers skins and configurable appearance.
 
 Development is organized into reviewable phases covering tooling, geometry, SVG rendering, visual state, appearance, responsive behavior, overlays, extension points, static/embedded builds, and release quality.
 

@@ -41,3 +41,7 @@ export function keyAttributes(key: SceneKey) {
     'stroke-width': 1,
   };
 }
+
+export function indicatorAttributes(key: SceneKey) {
+  return { ...key.indicator, display: key.indicatorDisplay, 'pointer-events': 'none' };
+}

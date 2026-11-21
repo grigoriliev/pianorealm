@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 3 · **Phase 3:** Complete
+> **Status:** Implementation · **Last completed phase:** Phase 4 · **Phase 4:** Complete
 > **Last verified:** 2026-11-21 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
@@ -12,9 +12,51 @@
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
 
+## Phase 4 handoff
+
+The [Phase 4 gate](DEVELOPMENT_PLAN.md#9-phase-4--programmatic-pressed-key-state) passed. The package root's existing `PianoKeyboard` class now provides `setPressedKeys`, `pressKey`, `releaseKey`, `clearPressedKeys`, and `getPressedKeys`. The README documents the array-only batch input, note normalization, ascending detached snapshots and visual-only behavior. Existing package exports and dependencies are unchanged.
+
+The handoff was verified on `main` at `81a78e2` with the Phase 4 changes in the working tree. The new state module and its unit tests are untracked, along with the pre-existing package `.gitignore`.
+
+- `src/state/pressed-keys.ts` stores canonical MIDI notes independently of the displayed range and appearance. The controller validates and normalizes all batch entries before changing state. Names use the instance notation at ingestion. [A-02 and A-05](docs/decisions/0001-notes-configuration-and-state.md)
+- The scene and live update path share Minimal's blue fill and fixed shape cue. The SVG adapters place one circle per visible key after the key body layers and hide each circle until its key is pressed. The circle fits inside the key's visible center strip, including with full-depth black keys. [Shared scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md) · [Accessibility and lifecycle ADR](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
+- An instance-local MIDI map lets state changes update only the changed keys' fill and dot visibility attributes. Off-range changes perform no DOM writes. Range and orientation rebuilds use the existing MIDI state, and resizing preserves it. The five state methods throw after destruction, and a new mount starts empty.
+- Coverage in `tests/unit/pressed-keys.test.ts`, `tests/unit/scene.test.ts` and `tests/integration/mount.test.ts` verifies normalization, retained notes, atomic failures, changed attributes, stable node identity, per-instance isolation and parsed SVG parity. The demo includes C major, F♯ minor and clear buttons. The F♯ minor voicing (F♯3, A3, C♯4) fits all three displayed ranges and highlights both black and white keys.
+
+### Completion criteria
+
+| Criterion | Verified evidence |
+| --- | --- |
+| Five typed, validated and documented methods | The built declarations expose all five methods. Integration tests cover runtime validation, and the package README shows all five calls. |
+| Canonical state, ordering and A-05 behavior | State and controller tests verify detached ascending snapshots, enharmonic deduplication, repeated-operation no-ops, atomic replacement and off-range retention. |
+| Targeted SVG updates | Integration tests assert root and child identity and check that mutations affect only the changed keys' fill and dot visibility attributes. |
+| Structural updates and sizing | Integration tests cover range changes, both orientations, viewport resize and zero-size recovery. |
+| Isolation, rejection and lifecycle | Integration tests cover independent instances, rejected batches without writes, throws after destruction and an empty state on remount. |
+| Shared scene and private serializer | Node tests verify DOM independence and visible intersection. Parsed output matches mounted key and indicator attributes in both orientations. |
+| Package checks and project records | Typecheck, the full test suite and build passed again at handoff. The development plan records the verified gate. |
+
+## Phase 4 verification
+
+Package commands ran from `packages/keyboard` with Node 24.22.1 and npm 11.19.1 from the IntelliJ IDEA runtime. The default shell path did not contain npm.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build` before edits | Passed. Vitest ran 148 tests across five files and Vite and TypeScript built the Phase 3 package. |
+| `npm run typecheck` | Passed again at handoff with no TypeScript diagnostics. |
+| `npm test` | Passed again at handoff with 157 tests across six files. |
+| `npm run build` | Passed again at handoff. Vite emitted the ESM bundle and source map, and TypeScript emitted declarations. |
+| `node --input-type=module` with inline assertions against the built package | Passed. Verified the five prototype methods, unchanged root exports, privacy of state and serializer paths, and demo exclusion from the production source map. |
+| `./node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly false --declaration false --outDir /tmp/pianorealm-phase4/emit`, then `node --input-type=module` with inline assertions | Passed. The temporary output was marked as ESM. In plain Node without DOM globals, the scene and serializer displayed only the two visible notes in a mixed visible/off-range selection and generated deterministic markup. |
+| `python3 /tmp/pianorealm-phase4/demo-smoke.py` | Passed in headless Firefox 160.0.1 with loopback access for Vite and Marionette. Verified rendered C-major fills and dots in all three demo keyboards, clearing with stable roots, byte-identical highlighted SVG downloads, off-range press/hide/restore and orientation changes, and the narrow scrollable layout. The initial sandboxed invocation could not open a loopback socket. |
+| `git diff --check` and `git status --short --untracked-files=all` from the repository root | Whitespace check passed. Changes are confined to the keyboard package. The pre-existing untracked package `.gitignore` was preserved. |
+
+The F♯ minor demo update passed `npm run typecheck && npm test && npm run build` with 157 tests across six files. `python3 /tmp/pianorealm-f-sharp-minor/demo-smoke.py` passed in headless Firefox 160.0.1. It verified that F♯ minor replaced C major in all three keyboards, that clearing preserved the roots and that highlighted SVG downloads matched the mounted SVGs.
+
+Firefox was the only real browser checked for Phase 4. Other browsers, assistive technologies and embedded hosts remain unverified for this feature.
+
 ## Phase 3 handoff
 
-The Phase 3 implementation and handoff are recorded in `df1dc7b`. Phase 3 is complete and Phase 4 is pending.
+The Phase 3 implementation and handoff are recorded in `df1dc7b`.
 
 ### Implementation decisions
 
@@ -67,7 +109,7 @@ Checks ran from `packages/keyboard` with Node 24.22.1 and npm 11.19.1.
 | `python3 /tmp/pianorealm-demo.OsnVSS/smoke.py` | Passed. The temporary smoke script launched `npm run dev:demo -- --strictPort --port 44051` on loopback and opened `/demo/` in headless Firefox 160.0.1. All three keyboards rendered with the expected MIDI notes and viewBox. Browser clicks saved three standalone SVG files that matched their mounted roots byte for byte. At a 480 px viewport, the full keyboard scrolled within its card. |
 | `git diff --check` from the repository root | Passed. |
 
-Download prompts and rendering in other browsers, mobile devices, and embedded webviews remain untested. Phase 4 remains the next library task.
+Download prompts and rendering in other browsers, mobile devices, and embedded webviews remain untested.
 
 ## Phase 2 completion gate
 
@@ -110,8 +152,9 @@ From the repository root, `git diff --check` passed and `git status --short --un
 - The sandbox can block the esbuild install script. The offline retry used the existing npm cache and the installed native binary worked for both Vitest and Vite. This checkout also needed the IDE-provided Node runtime added to `PATH`.
 - Geometry throws `RangeError` when individually finite sizing values would make the selected range's intrinsic extent overflow. Fractional coordinates use floating-point precision. A rotated edge that rounds beyond the viewport moves inward by one floating-point step. Integer fixture coordinates are exact. With an extreme width ratio, a key's far edge can round to its start, leaving no hittable interval even though the key record retains a positive width. The Node probe reproduced this for C4–C♯4 with a black-key width of `Number.EPSILON`.
 - Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
-- Later milestones cover pressed-key state (Phase 4), customization (Phase 5), advanced sizing and motion (Phase 6), overlays (Phase 7), events and public hit testing (Phase 8), and the public static SVG API, classic-script output, and Anki verification (Phase 9). CommonJS and optional public key bounds remain deferred.
+- Phase 4 uses Minimal paint for both initial rendering and targeted updates. Skin switching and configurable appearance remain Phase 5 work. Configurable pressed indicators are scheduled for Phase 7, and the serializer remains private until the public static SVG work in Phase 9. The Phase 4 Firefox smoke script is temporary and lives outside the repository.
+- Later milestones cover customization (Phase 5), advanced sizing and motion (Phase 6), overlays (Phase 7), events and public hit testing (Phase 8), and the public static SVG API, classic-script output, and Anki verification (Phase 9). CommonJS and optional public key bounds remain deferred.
 
 ## Next task
 
-Begin Phase 4 with DOM-independent pressed-note storage. Use the instance notation when ingesting names, store canonical MIDI numbers independently of the visible range, and return a fresh ascending array. Test atomic replacement after invalid input, deduplication, repeated-operation no-ops, and restoring an offscreen pressed note by changing the range. Then extend the shared scene and mounted adapter so state-only changes update only affected visible key nodes. [Phase 4 plan](DEVELOPMENT_PLAN.md#9-phase-4--programmatic-pressed-key-state) · [Visual state ADR](docs/decisions/0001-notes-configuration-and-state.md)
+Begin Phase 5 by defining typed skin tokens and the accepted resolution order. Pass the same resolved appearance to scene construction and targeted key updates, which currently use Minimal tokens. Verify that switching between Minimal and Classic preserves the layout and both visible and off-range pressed notes. [Phase 5 plan](DEVELOPMENT_PLAN.md#10-phase-5--skins-and-configurable-appearance) · [Configuration ADR](docs/decisions/0001-notes-configuration-and-state.md)

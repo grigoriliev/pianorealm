@@ -29,7 +29,7 @@ npm run dev:demo
 
 Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
 
-Each **Download SVG** button saves the SVG currently mounted in that card. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. Each **Download SVG** button saves the SVG currently mounted in that card, including its highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
 
 ## Note utilities
 
@@ -65,6 +65,20 @@ The constructor accepts `container`, `range`, `orientation`, `notation` and `siz
 Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected, hidden, or zero-size host waits for a usable viewport. The adapter observes size changes where `ResizeObserver` is available. Use `resize()` after a host change if observation is unavailable or you need an immediate update. In fixed mode, `sizing.width` and `sizing.height` set the viewport in CSS pixels, with each omitted dimension taken from the oriented geometry. Fixed keyboards can be constructed while their host is detached.
 
 To check fitting manually, leave the C♯4–D♯4 range horizontal and set the host content box to 100 × 100 px. The 32 × 100 keyboard is centered with 34 px on either side. Switch to vertical and check that the 100 × 32 keyboard is centered with 34 px above and below. Set the host height to zero, call `resize()`, then restore the height and call `resize()` again. Mount a second keyboard in a separate host and verify that destroying the first leaves the second visible.
+
+## Visually press keys
+
+```ts
+piano.setPressedKeys(['G4', 'E4', 'B#3', 60]);
+piano.getPressedKeys(); // [60, 64, 67]
+piano.pressKey('C#4');
+piano.releaseKey('E4');
+piano.clearPressedKeys();
+```
+
+These methods control the drawing only. Minimal shows pressed keys with a blue fill and a dot. `setPressedKeys` accepts an array (including a readonly array in TypeScript) of MIDI numbers and note names. Other collections, such as sets and generators, are unsupported. Names are interpreted using the keyboard's notation when passed in. Equivalent notes share one MIDI identity, and an invalid item leaves the entire selection and drawing unchanged.
+
+`getPressedKeys()` returns a new array in ascending MIDI order. It includes any valid MIDI note still pressed outside the displayed range. Changing the visible range, flipping orientation, or resizing preserves that selection. `pressKey` adds one note, `releaseKey` removes one note, and `clearPressedKeys` releases all notes. Repeating a command with the same result leaves the drawing untouched.
 
 ## Configuration
 

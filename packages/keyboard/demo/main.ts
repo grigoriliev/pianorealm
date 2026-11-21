@@ -7,7 +7,7 @@ const samples = {
   full: { range: { from: 'A0', to: 'C8' }, orientation: 'horizontal' },
 } satisfies Record<string, Pick<KeyboardOptions, 'range' | 'orientation'>>;
 
-for (const [name, options] of Object.entries(samples)) {
+const keyboards = Object.entries(samples).map(([name, options]) => {
   const section = document.getElementById(name);
   const container = section?.querySelector<HTMLElement>('.keyboard-host');
   const button = section?.querySelector('button');
@@ -15,7 +15,7 @@ for (const [name, options] of Object.entries(samples)) {
     throw new Error(`Missing demo markup for ${name}`);
   }
 
-  new PianoKeyboard({ container, ...options, sizing: { mode: 'fixed' } });
+  const piano = new PianoKeyboard({ container, ...options, sizing: { mode: 'fixed' } });
   button.addEventListener('click', () => {
     // Each demo host contains a single drawing. Export the whole SVG as mounted.
     const svg = container.querySelector('svg');
@@ -31,4 +31,15 @@ for (const [name, options] of Object.entries(samples)) {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
-}
+  return piano;
+});
+
+document.getElementById('highlight-chord')?.addEventListener('click', () => {
+  for (const piano of keyboards) piano.setPressedKeys(['C4', 'E4', 'G4']);
+});
+document.getElementById('highlight-f-sharp-minor')?.addEventListener('click', () => {
+  for (const piano of keyboards) piano.setPressedKeys(['F#3', 'A3', 'C#4']);
+});
+document.getElementById('clear-highlights')?.addEventListener('click', () => {
+  for (const piano of keyboards) piano.clearPressedKeys();
+});
