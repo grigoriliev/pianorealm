@@ -1,0 +1,495 @@
+# `@pianorealm/keyboard` — Package Architecture
+
+> **Status:** Proposed architecture baseline; **not an implementation report**  
+> **Package:** `@pianorealm/keyboard`  
+> **Scope:** Internal design for a framework-independent, display-only piano keyboard visualization library  
+> **Related:** [Ecosystem vision](../../docs/ECOSYSTEM.md) · [Ecosystem architecture](../../docs/ARCHITECTURE.md) · [Keyboard product specification](./PROJECT_SPEC.md)
+>
+> This document specifies architectural boundaries and recommends implementation contracts. **Illustrative TypeScript signatures are proposals**, not published API commitments. Record unresolved choices in an ADR before relying on them across packages. **MUST**, **MUST NOT**, **SHOULD**, and **MAY** communicate requirement strength.
+
+## 1. Purpose, authority, and non-goals
+
+The package renders a configurable piano keyboard and exposes **visual state**, not instrument behavior. It serves browser pages, embedded webviews, offline applications, and Anki flashcards. Its geometry and static SVG generation should also be usable without a mounted browser DOM.
+
+Requirements live in `PROJECT_SPEC.md`; ecosystem dependency and integration rules live in `docs/ARCHITECTURE.md`. This document determines **how** keyboard modules cooperate. If documents conflict, record and resolve the conflict rather than silently changing the product requirements.
+
+The package **MUST NOT** implement pointer/mouse/touch/computer-key event handling, MIDI device access, note transmission, audio playback, or sound scheduling. Its `pressKey()` method means *mark a note visually pressed*. The application or a future optional `@pianorealm/interaction` package owns user gestures; `@pianorealm/midi` owns device I/O; `@pianorealm/audio` owns audio. None is a runtime dependency of this package.
+
+### Design priorities
+
+1. Correct, deterministic musical and geometric calculations.
+2. Identical geometry and appearance rules for mounted and static rendering.
+3. Targeted visual updates without redrawing for each key-state change.
+4. Narrow, typed public APIs; internal modules remain private.
+5. Resilient resource cleanup and multiple-instance isolation.
+6. Scoped CSS, no network assets, and compatibility-aware browser usage.
+7. Feature-rich visualization without turning the package into an application framework.
+
+## 2. Architectural overview
+
+```text
+                 Public API: PianoKeyboard / renderToSVG
+                                  |
+            +---------------------+----------------------+
+            |                     |                      |
+      Configuration           Visual state         Events / extensions
+      + validation            (pressed/overlays)     (documented hooks)
+            |                     |                      |
+            +----------+----------+----------------------+
+                       |
+           Note utilities + geometry + skin resolution
+                       |
+                 Render description
+               (DOM-independent data)
+                      / \
+                     /   \
+         SVG string serializer     Mounted SVG renderer
+         (no browser required)      (DOM + node registry)
+                   |                         |
+          Self-contained SVG        Per-key DOM updates
+                                             |
+                                 Observer + animation lifecycle
+```
+
+**Main rule:** musical note parsing, layout, visual-state modeling, and SVG serialization must not rely on document globals or SVG element instances. Only the mounted adapter needs a browser DOM.
+
+### Suggested module dependency direction
+
+```text
+public/ -> controller/ -> {config/, notes/, geometry/, state/, skins/, scene/}
+                                   scene/ -> svg/serializer
+public/static -> {config/, notes/, geometry/, state/, skins/, scene/, svg/serializer}
+controller/ -> svg/dom, sizing/, events/, extensions/
+```
+
+Low-level modules **MUST NOT** import the controller, mounted renderer, or package entry point. Avoid circular imports.
+
+## 3. Proposed package layout
+
+```text
+packages/keyboard/
+├── ARCHITECTURE.md
+├── PROJECT_SPEC.md
+├── DEVELOPMENT_PLAN.md                # when created
+├── PROJECT_STATE.md                   # when created
+├── README.md                          # when created
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── src/
+│   ├── index.ts                       # intentional public exports only
+│   ├── public/
+│   │   ├── PianoKeyboard.ts
+│   │   └── types.ts
+│   ├── config/
+│   │   ├── defaults.ts
+│   │   ├── normalize.ts
+│   │   └── validate.ts
+│   ├── notes/
+│   │   ├── notation.ts
+│   │   └── ranges.ts
+│   ├── geometry/
+│   │   ├── layout.ts
+│   │   ├── horizontal.ts
+│   │   ├── vertical.ts
+│   │   └── hit-testing.ts
+│   ├── state/
+│   │   ├── pressed-keys.ts
+│   │   └── overlays.ts
+│   ├── skins/
+│   │   ├── builtins.ts
+│   │   └── resolve.ts
+│   ├── scene/
+│   │   └── build-scene.ts
+│   ├── svg/
+│   │   ├── serialize.ts
+│   │   └── dom-renderer.ts
+│   ├── sizing/
+│   │   └── resize-controller.ts
+│   ├── events/
+│   │   └── emitter.ts
+│   ├── extensions/
+│   │   └── lifecycle.ts
+│   └── internal/
+│       └── svg-safety.ts
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── browser/
+│   └── fixtures/
+├── docs/
+│   ├── api/
+│   └── guides/
+└── demo/                             # package playground or workspace app
+```
+
+This is **a suggested logical layout**, not a requirement to create empty folders or split trivial functions into many files. Start with the modules needed by the current phase and preserve the dependencies above. The exact test/demo locations may follow the eventual workspace conventions.
+
+## 4. Data contracts and immutability
+
+### 4.1 Notes and ranges
+
+- The canonical note identity is a MIDI integer in `[0, 127]`.
+- Public note inputs may be numbers or supported note-name strings; normalize **once at API boundaries**.
+- Default scientific pitch notation is `C4 = MIDI 60`; octave display offsets and accidental spelling are explicit configuration.
+- Internal range is a normalized inclusive pair `{ from: number; to: number }`, with `from <= to`.
+- Use discriminated types for orientation (`'horizontal' | 'vertical'`), key kind (`'white' | 'black'`), and sizing mode (`'container' | 'fixed'`).
+- Reject `NaN`, fractional/out-of-bounds MIDI values, reversed ranges, unsupported notation, and non-finite dimensions with actionable errors.
+
+Illustrative internal contracts:
+
+```ts
+type MidiNote = number;             // validated integer 0..127 at boundaries
+type NoteInput = number | string;   // external; not all strings are valid
+interface MidiRange { from: MidiNote; to: MidiNote }
+type Orientation = 'horizontal' | 'vertical';
+interface KeyBounds { x: number; y: number; width: number; height: number }
+interface KeyLayout { note: MidiNote; kind: 'white' | 'black'; bounds: KeyBounds }
+interface KeyboardLayout {
+  width: number;
+  height: number;
+  orientation: Orientation;
+  keys: readonly KeyLayout[];
+}
+```
+
+Use immutable results or treat returned structures as read-only. Do not leak mutable maps, DOM references, or internal skin objects to consumers.
+
+### 4.2 Separate sources of truth
+
+Keep these domains distinct:
+
+| Domain | Ownership | Examples |
+| --- | --- | --- |
+| Normalized configuration | Controller | Range, orientation, sizing, skin selection |
+| Visual pressed state | State module | Set of MIDI note numbers |
+| Key overlays / labels | State and scene modules | Badges, circles, annotations |
+| Computed layout | Geometry module | Key bounds, layering, hit regions |
+| Resolved appearance | Skin module | Colors, borders, effects, indicator styles |
+| Mounted nodes | DOM renderer | Root SVG, keyed node lookup, generated IDs |
+| Runtime resources | Controller / owners | Observers, listeners, subscriptions, extension disposers |
+
+Do not store independent, contradictory copies of the same property. Layout and visual scene are **derived** from configuration and state.
+
+### 4.3 Pressed-state semantics — decision required
+
+The specification requires predictable behavior for notes outside the displayed range, but does **not** prescribe whether they remain in logical state. **Proposed default:** retain valid MIDI pressed notes in the logical set; render only those inside the current range. This makes range changes non-destructive and supports external MIDI-driven visualization. Finalize and document this before Phase 4.
+
+`setPressedKeys` should normalize, deduplicate, and compare sets; `getPressedKeys` should return a new, deterministically ordered array (proposed: ascending MIDI). Repeating an already-applied action should have no visible effect. Decide whether no-op operations emit events before finalizing the event API.
+
+## 5. Note parsing and range validation
+
+The note utility module is **pure** and has no knowledge of screen coordinates, SVG, skin names, or the DOM.
+
+Responsibilities:
+
+- Convert note names to MIDI and back under documented octave settings.
+- Recognize the semitone class (white/black) using modulo 12.
+- Support sharp/flat spellings and consistent accidental preference in generated labels.
+- Normalize inclusive ranges, including single-note ranges and ranges containing only black notes.
+- Emit specific validation errors rather than silently clamping invalid notes.
+
+Tests MUST cover octave boundaries, enharmonic aliases, full MIDI bounds, invalid strings, accidental formatting, and alternate octave display conventions. Avoid conflating note spelling with MIDI pitch identity.
+
+## 6. Geometry engine
+
+### 6.1 Responsibilities and invariants
+
+`calculateLayout(normalizedOptions)` must return a deterministic, finite layout without creating any DOM nodes. It computes key bounds, layering order, and anchor regions usable by labels and overlays.
+
+**Invariants:**
+
+- Each valid MIDI note in the selected inclusive range has exactly one key geometry record.
+- White keys occupy the primary chromatic progression lane; black keys overlap the appropriate white-key gap and are drawn above whites.
+- Horizontal orientation has lower pitches to the **left**; vertical has lower pitches at the **bottom**, with black keys on the **left** side of white keys.
+- Switching orientation does not change note identity or state.
+- Partial ranges, black-key endpoints, single-key ranges, and all-black ranges never yield division by zero, `NaN`, or negative dimensions.
+- Geometry is independent of skin; optional decorative layout adjustments must remain explicitly defined and testable.
+
+### 6.2 Recommended base layout strategy
+
+1. Normalize MIDI endpoints and generate ordered key descriptors.
+2. Compute the white-key coordinate lattice for the complete relevant semitone sequence, including **virtual neighboring white keys outside the visible range** where needed to anchor endpoint black keys.
+3. Calculate black-key positions from adjacent white-key centers/gaps, not from equal semitone spacing.
+4. Resolve the viewport policy for truncated endpoints (clip, inset, or extend) **explicitly**; do not accidentally render outside the container.
+5. Map base-axis coordinates into horizontal or vertical output; vertical reverses the pitch axis so low notes are at the bottom.
+6. Emit stable key records and overlay/label anchor geometry; keep pixels/normalized units consistent.
+
+**Open choice:** exact endpoint cropping, single-black-key sizing, and fixed-size versus container-width fitting need a documented decision and regression fixtures. The algorithm above is a strategy, not a silent policy choice.
+
+### 6.3 Sizing and coordinate systems
+
+- Choose one **canonical layout coordinate system** (recommended: CSS-pixel-equivalent numeric units inside an SVG `viewBox`).
+- Define key width/height, black/white ratios, minimum/maximum constraints, and padding in one place.
+- `container` mode derives an available viewport from observed host dimensions; `fixed` mode derives dimensions from explicit configuration.
+- Responsive scaling, scroll/clip behavior, and aspect-ratio constraints must be deterministic and documented.
+- Geometry uses provided numeric dimensions; it must not query `getBoundingClientRect()` itself.
+- Avoid layout feedback loops or geometry changes caused merely by shadow, glow, or border styling.
+
+### 6.4 Hit testing for future interaction
+
+A future interaction package needs key identification **without** parsing SVG nodes. Recommend a pure geometry query backed by the same key bounds. Possible public form (not finalized):
+
+```ts
+piano.getNoteAtPoint(x, y): number | null;
+```
+
+Before publishing, define whether coordinates are container-local CSS pixels, SVG user units, or another system; whether transformed/scaled layouts are accounted for; and how overlapping white/black keys prioritize the **visually topmost** black key. Pointer listeners themselves remain outside the package. Optional read-only bounds may be exposed only if justified by a real integration use case.
+
+## 7. Shared scene and two SVG output paths
+
+A **render description** (or scene) is recommended as the shared rendering contract:
+
+```text
+normalized options + pressed state + overlays
+           |            |             |
+           +----- geometry + appearance resolution
+                               |
+                         scene description
+                        /                 \
+              string serializer       mounted DOM adapter
+```
+
+The scene represents stable key identities, geometry, style, labels, indicators, overlays, and layering. It **does not** contain browser element references.
+
+### 7.1 Static serializer
+
+`PianoKeyboard.renderToSVG(options)` must:
+
+- Produce self-contained SVG markup from pure inputs, without requiring a container.
+- Reuse the same geometry, skin resolution, labels, and overlay semantics as mounted rendering.
+- Include explicit dimensions/`viewBox`, and embed all necessary styles and paint definitions.
+- Escape all untrusted text and attribute values; reject unsupported SVG payloads rather than injecting raw markup unsafely.
+- Avoid global CSS, external fonts/images/stylesheets, and network requests.
+- Define a stable strategy for SVG `<defs>` identifiers so separately embedded instances do not collide.
+- Yield deterministic output for identical inputs **under the documented ID policy**; consider explicit `idPrefix` input for stable static snapshots where needed.
+
+**Static SVG has no browser animation or events.** It should show the requested visual end state. Node-compatible generation is the preferred target and should be verified with a Node smoke test.
+
+### 7.2 Mounted DOM renderer
+
+Owns the SVG root and any nodes created beneath it; maintains an internal `Map<MidiNote, KeyNodes>` or equivalent for targeted updates. Suggested behavior:
+
+- Mount with a full scene on first render.
+- For `pressKey/releaseKey`, update only affected key presentation nodes/attributes/classes and indicators.
+- For overlays and labels, update the relevant subtrees where practical.
+- For range/orientation or structural layout changes, a full scene rebuild is acceptable **if state remains intact**.
+- Keep structural/render changes separate from animation CSS decisions.
+- Avoid writing to elements outside the caller-supplied container.
+- Multiple instances must have isolated nodes, styles, SVG definitions, and disposal scopes.
+
+Do not expose DOM nodes or internal CSS classes as a supported interoperability API. DOM tests in an emulated environment are not a substitute for real-browser rendering tests.
+
+### 7.3 Stacking and overlays
+
+A proposed layer order, from back to front:
+
+1. Keyboard background and base white keys.
+2. Black keys above white-key bodies.
+3. Note-specific highlights and pressed coloring (applied per key, not as an accidental global occlusion layer).
+4. Labels and configured indicators.
+5. User overlays and annotations (respecting an explicit per-type order).
+
+The final scene specification must define whether an overlay clips to its key, whether it may span neighboring keys, and how it behaves on very small dimensions. Allow multiple overlays for one note; never make overlays dependent on a particular skin.
+
+## 8. Skins and styling
+
+Skin objects **only** describe resolved appearance: backgrounds, key fills, borders, radii, shadow/gradient treatments, label colors, active-state visuals, indicator styles, and animation defaults. A skin **MUST NOT** change pitch order, MIDI numbers, state semantics, event delivery, or input behavior.
+
+Initial skin set: `minimal`, `classic`, `modern`, `neon`, `dark`, plus a documented high-contrast skin or equivalent accessibility mode. A custom skin mechanism should accept validated appearance tokens without allowing arbitrary mutation of renderer internals.
+
+**Proposed resolution order:** internal defaults → selected skin → user appearance overrides → accessibility overrides required by explicit settings. Finalize this precedence during architecture planning, especially for high-contrast and user-provided colors.
+
+Keep styles scoped inside the component, including embedded and Anki usage. Avoid selectors that affect host `.card`, `body`, or generic `svg`/`rect` elements. Prefer inline SVG presentation attributes/embedded scoped styles where they improve standalone export and host isolation; define a consistent strategy so static and mounted output match. SVG definitions (gradients, filters, masks) require collision-safe IDs.
+
+## 9. Configuration, mutation, and update planning
+
+Configuration normalization and validation happen before mutation. **Recommended transactional approach:** validate an incoming update completely, derive new normalized configuration, then apply it; never leave the component partially updated on error.
+
+Define update classes:
+
+| Change | Expected work |
+| --- | --- |
+| Press/release a note | Targeted affected-key visual change; no layout recompute |
+| Change an indicator/overlay | Recompute affected scene fragments where practical |
+| Change a skin or styling override | Re-resolve appearance; preserve notes/overlays |
+| Change dimensions | Recompute geometry and affected visuals; preserve notes/overlays |
+| Change orientation or range | Recompute geometry and rebuild structural SVG if needed |
+| Destroy | Dispose observers, events, animations, extensions, and mounted nodes |
+
+`setOptions()` must have documented **nested merge vs. replace** behavior. Proposed: deep merge only for known option objects with arrays replaced and unknown keys rejected; this is **not yet binding**. Validate all changed paths and define precedence between constructor options and later updates.
+
+## 10. Controller and public API
+
+The `PianoKeyboard` controller coordinates configuration, state, derived layout/scene, renderer, observers, events, and extensions. It is a façade, **not** a catch-all place for geometry, SVG string templates, or note math.
+
+Baseline instance API required by the specification:
+
+```ts
+class PianoKeyboard {
+  constructor(options: KeyboardOptions);
+  setPressedKeys(keys: NoteInput[]): void;
+  pressKey(key: NoteInput): void;
+  releaseKey(key: NoteInput): void;
+  clearPressedKeys(): void;
+  getPressedKeys(): number[];
+  setRange(from: NoteInput, to: NoteInput): void;
+  setOrientation(orientation: Orientation): void;
+  setSkin(skin: string | CustomSkin): void;   // exact type TBD
+  setOptions(options: KeyboardOptionsPatch): void;
+  resize(): void;
+  destroy(): void;
+  static renderToSVG(options: StaticKeyboardOptions): string;
+}
+```
+
+Also design narrow public surfaces for overlays, typed events, extension installation, and (if approved) hit testing. Publish public types via the package root or intentionally documented subpath exports; consumers **MUST NOT** depend on `src/` paths. Keep validation and error naming consistent across constructor and mutators. Decide whether use-after-`destroy()` throws or is a no-op; `destroy()` itself is recommended to be idempotent.
+
+### Construction and failure cases
+
+Mounted construction requires a valid DOM container and enough dimensions to render or a documented zero-size waiting state. Handle disconnected/zero-size containers, repeated mounting attempts, invalid configurations, and observers not present in older embedded webviews without leaking resources.
+
+## 11. Events and extension lifecycle
+
+A small typed emitter should support subscribing/unsubscribing to **visualization** events such as:
+
+- `pressedKeysChanged`
+- `rangeChanged`
+- `orientationChanged`
+- `skinChanged`
+- `resized`
+- `destroyed`
+
+Public events MUST NOT impersonate pointer gestures, MIDI note-on/off, or audio voice activity. Payloads should be plain immutable data and represent the **committed new state**. Finalize no-op emission, event order, sync/async delivery, errors in listeners, and teardown timing before publishing event contracts. Prefer `on(...)` returning an unsubscribe function or equivalent explicit `off(...)` support.
+
+Extensions may register skins or visual contributions, subscribe to public events, and release their own resources. Define a small `init / dispose` protocol and ensure extension disposal occurs during keyboard destruction. Reject cycles, hidden DOM patching, and a generalized dependency-injection/plugin framework in version 1.
+
+## 12. Responsive and animation lifecycle
+
+The controller owns a resize coordinator that measures the container in the DOM and passes **numbers** to geometry. Use `ResizeObserver` when available; feature-detect it, avoid recursive resize loops, and provide explicit `resize()` for hosts without observer support. Batch frequent size notifications where appropriate and skip updates when effective dimensions are unchanged.
+
+Animation is a presentation concern (prefer CSS transitions scoped to the component). Respect `prefers-reduced-motion`; an explicit `enabled: false` must always disable motion. The mounted renderer should not require animation timers to maintain correct pressed-key state. Static SVG must show a stable final frame.
+
+## 13. Accessibility and security
+
+- Give the root SVG an appropriate accessible name/description or a documented decorative mode; avoid misleading button semantics for a display-only component.
+- Support legible labels, high contrast, and non-color-only indicators; test compact and vertical views.
+- Avoid unintended tab stops and keyboard handling in the base package; future interaction accessibility belongs to an optional integration.
+- Escape labels, annotations, text overlays, CSS values, and attributes as appropriate. For custom SVG elements, prefer a validated declarative shape schema rather than raw HTML/SVG markup; never treat arbitrary supplied strings as trusted XML.
+- Avoid `innerHTML` for untrusted SVG strings in the live path; prefer DOM creation APIs or sanitized, tightly controlled generated markup.
+- Do not fetch external assets or execute embedded scripts; avoid dangerous URLs, event-handler attributes, `<foreignObject>`, or unrestricted custom element injection.
+- Document user-supplied color/length/filter formats that are accepted and reject unsafe or unsupported values.
+
+## 14. Embedded environments, Anki, and distribution
+
+### Host isolation
+
+- No framework dependencies, document-wide CSS resets, remote fonts, external resources, or runtime fetches.
+- Avoid `document.write()` and assumptions that card navigation creates a new page or JavaScript context.
+- Support repeated initialization, multiple instances, duplicate-script scenarios where relevant, and explicit cleanup.
+- Use instance-scoped identifiers and selectors, including gradients, masks, filters, and clip paths.
+- Feature-detect optional browser APIs; document minimum **tested** host versions rather than claiming universal compatibility.
+
+### Artifacts
+
+The specification proposes:
+
+```text
+@pianorealm/keyboard                npm package (ESM + .d.ts)
+pianorealm-keyboard.esm.js          ESM browser/library artifact
+pianorealm-keyboard.umd.js          classic-script standalone bundle
+pianorealm-keyboard.umd.min.js      minified standalone bundle
+Pianorealm.Keyboard                proposed browser global
+```
+
+Bundle filenames, exports map, exact global shape, and whether CommonJS is justified **remain Phase 0 decisions**. The standalone bundle must work offline without external runtime dependencies; ensure it does not overwrite other `Pianorealm` namespace members. Export a self-contained static SVG path when scripting is undesirable. Verify actual Anki template and night-mode behavior on named client versions; do not label untested clients supported.
+
+## 15. Testing strategy and quality gates
+
+| Level | Must verify |
+| --- | --- |
+| Pure unit tests | Note parsing, notation, range validation, key classification, layout invariants, sizing, hit-test geometry |
+| State tests | Deduplication, ordering, range semantics, no-ops, multiple pressed keys, overlays |
+| Scene/serializer tests | Determinism, escaping, skin application, static/live geometry equivalence, valid SVG markup |
+| DOM integration tests | Targeted per-key mutation, lifecycle cleanup, repeated mount/destroy, state persistence |
+| Browser tests | Actual SVG geometry, both orientations, scaling/resize, contrast/reduced motion, CSS isolation |
+| Visual regression | Representative skin × orientation × range × pressed/overlay states (curated matrix) |
+| Distribution smoke tests | npm ESM + types, standalone classic-script global, offline operation, Node static SVG |
+| Embedded compatibility | Anki desktop/mobile clients tested individually; initialization/reuse/night mode |
+
+Use Vitest for unit/integration tests and a real-browser runner for layout and visual checks. Run tests/build/typecheck at each phase checkpoint; never claim execution or compatibility without testing. Track expected differences such as fractional pixel rounding or text rendering when comparing static and mounted SVG.
+
+### Essential geometry fixtures
+
+- `C3`–`C5` and `A0`–`C8`.
+- Ranges starting/ending on sharps/flats.
+- One white key and one black key.
+- Two adjacent notes with different colors/kinds.
+- Full MIDI `0`–`127`.
+- Both orientations and multiple aspect ratios.
+- Tiny/zero-size containers and unusual explicit dimensions.
+
+### Release gates
+
+1. All documented API and state invariants have tests.
+2. Geometry correctness and live/static parity are demonstrated.
+3. No pointer/MIDI/audio dependencies or code have entered the package.
+4. No unscoped CSS, global ID collisions, or unsafe SVG interpolation.
+5. Cleanup and multi-instance behavior are verified.
+6. ESM/types and standalone offline builds pass smoke tests.
+7. Documented accessibility and embedded compatibility claims match real test evidence.
+8. Deferred requirements are explicitly listed; do not silently describe them as complete.
+
+## 16. Implementation sequencing
+
+Follow the package development plan when it exists. Recommended dependency-aware order:
+
+1. **Phase 0 — Decisions:** agree on range layout policy, out-of-range state, sizing coordinates, configuration merging, API/event rules, hit testing, static SVG IDs, browser global and host support baseline.
+2. **Core utilities:** TypeScript/Vite/Vitest setup; note parsing and validation.
+3. **Geometry:** pure positioning for arbitrary ranges and both orientations.
+4. **Scene and SVG:** base appearance, static serializer, initial mounted render path.
+5. **State:** pressed keys and targeted DOM updates.
+6. **Skins:** visual tokens, overrides, initial built-ins, high-contrast route.
+7. **Sizing and animation:** container/fixed modes, observer cleanup, reduced motion.
+8. **Labels and overlays:** validated primitives, stacking and clipping.
+9. **Events/extensions/hit testing:** narrow documented public contracts.
+10. **Embedded/release:** standalone exports, Anki guide/tests, documentation, playground, visual regression, packaging.
+
+These steps are **sequencing guidance**, not permission to omit original requirements. Build tests and cleanup checks within each phase rather than postponing them until final release.
+
+## 17. Decisions requiring ADRs before implementation
+
+| Decision | Why it matters | Proposed direction, not final |
+| --- | --- | --- |
+| Partial endpoint and single-black-key geometry | Consistent visual bounds | Virtual adjacent white keys + explicit clip/inset policy |
+| Geometry units and fit behavior | Cross-renderer parity | SVG user units aligned to CSS-pixel-equivalent viewport |
+| Out-of-range pressed state | State continuity | Retain normalized valid MIDI notes; render visible subset |
+| `setOptions()` semantics | Predictable updates | Validate first; merge known nested objects; replace arrays |
+| Public hit-test coordinates | Future `interaction` package | Document container-local coordinates and z-order |
+| Scene representation and ID generation | Static/live consistency | Pure scene + deterministic static IDs / per-instance DOM IDs |
+| Skin override precedence | Styling and accessibility | Defaults → skin → user override → explicit accessibility policy |
+| Event batching and error semantics | Public API stability | Post-commit events; documented no-op behavior |
+| Custom SVG overlay policy | Security and portability | Declarative, validated primitives; no unchecked raw markup |
+| Standalone global and bundle naming | Multi-bundle coexistence | `Pianorealm.Keyboard`, namespaced UMD |
+| Minimum embedded client support | Avoid false compatibility claims | Test matrix with declared versions |
+
+Create ADRs under `docs/decisions/` for ecosystem-wide contracts and under the package's own `docs/decisions/` for keyboard-only decisions, following the repository convention. Update this document when decisions are ratified; avoid rewriting historical rationale.
+
+## 18. Architecture acceptance checklist
+
+- [ ] Each feature has a single owning module and obeys dependency direction.
+- [ ] Geometry, note parsing, scene building, and static SVG are DOM-independent.
+- [ ] Mounted and static rendering share the same layout and style resolution.
+- [ ] Key-state-only updates avoid full structural SVG rebuilds.
+- [ ] State is preserved across skin, orientation, range, and size changes per finalized policy.
+- [ ] Configuration mutations are validated and predictable.
+- [ ] External packages can use documented APIs without reading private SVG/DOM structures.
+- [ ] Keyboard has zero dependencies on interaction, MIDI, and audio packages.
+- [ ] SVG generation validates/escapes untrusted inputs; IDs/styles are isolated.
+- [ ] Observers, subscriptions, animations, and extensions cleanly dispose.
+- [ ] Offline standalone and npm outputs are verified in supported environments.
+- [ ] Tests, docs, and declared supported platforms reflect implementation evidence.
+
+---
+
+**Architectural baseline:** `@pianorealm/keyboard` is a portable, deterministic **visualization engine**. Its core produces geometry and visual descriptions; the static serializer turns them into standalone SVG; the mounted adapter updates browser nodes efficiently. Human interaction, MIDI transport, and audio remain independently owned capabilities composed by applications through documented public contracts.
