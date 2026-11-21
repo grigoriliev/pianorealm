@@ -36,7 +36,7 @@ export function validateNotation(options: NotationOptions) {
   return Object.freeze({ accidentalPreference, octaveOffset });
 }
 
-function validateMidi(note: unknown): number {
+export function validateMidi(note: unknown): number {
   if (typeof note !== 'number') {
     throw new TypeError('A MIDI note must be a number');
   }

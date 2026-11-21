@@ -5,13 +5,13 @@
 Pianorealm is an open-source, framework-independent JavaScript and TypeScript ecosystem for piano visualization, interaction, MIDI connectivity, and audio. Its goal is to let developers combine only the capabilities they need—from a static keyboard diagram in a flashcard to a playable, MIDI-connected application.
 
 > [!IMPORTANT]
-> **Early development.** Pianorealm is currently in its architecture and initial implementation stages. The packages and APIs described below are plans, **not released functionality**. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
+> **Early development.** The keyboard package has a local ESM build for note utilities and a tested internal geometry engine. SVG rendering is planned. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
 
 ## Packages
 
 | Package | Responsibility | Status |
 | --- | --- | --- |
-| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | First package; implementation planned |
+| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | Phase 2 complete. Local note utilities, internal configuration validation, and geometry for both orientations. |
 | **`@pianorealm/interaction`** | Pointer, mouse, touch, and computer-keyboard input | Planned |
 | **`@pianorealm/midi`** | MIDI input/output and device integration | Planned |
 | **`@pianorealm/audio`** | Audio generation and playback | Planned |
@@ -50,11 +50,9 @@ See the [keyboard specification](packages/keyboard/PROJECT_SPEC.md), [package ar
 
 The [keyboard project state](packages/keyboard/PROJECT_STATE.md) is the authoritative record of what has actually been completed and verified.
 
-At the time of this README's creation, Phase 0 (architecture planning and decisions) is complete, and Phase 1 (tooling, note utilities, and configuration) is the next development milestone. No keyboard package release or working installation is claimed yet.
+Phase 2 (DOM-independent keyboard geometry) is complete. The next development milestone is Phase 3, the shared scene model and minimal mounted SVG.
 
 Development is organized into reviewable phases covering tooling, geometry, SVG rendering, visual state, appearance, responsive behavior, overlays, extension points, static/embedded builds, and release quality.
-
-**There are no installation instructions yet** because the first package is not documented as published. When a release exists, this README will link to package-specific installation and usage instructions.
 
 ## Repository guide
 
@@ -93,7 +91,7 @@ Pianorealm is being developed incrementally, with design decisions, development 
 
 If you'd like to discuss a design or report a problem, [open an issue](https://github.com/grigoriliev/pianorealm/issues). Before proposing a change to package boundaries or public contracts, review the [ecosystem architecture](docs/ARCHITECTURE.md) and relevant architecture decision records.
 
-There is not yet a documented contributor setup or runnable build workflow; those will be added as the implementation is established.
+The private keyboard package builds locally. Follow its [developer setup and verification commands](packages/keyboard/README.md#development).
 
 ## License
 

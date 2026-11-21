@@ -74,7 +74,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | --- | --- | --- | --- | --- |
 | **0** | Architecture and ADRs | Existing ecosystem and package docs | Decisions and contracts documented | Complete |
 | **1** | Project foundation and note utilities | 0 | Tooling works; note/validation tests pass | Complete |
-| **2** | Pure geometry engine | 1 | Correct both-orientation layouts and edge cases | Not started |
+| **2** | Pure geometry engine | 1 | Correct both-orientation layouts and edge cases | Complete |
 | **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Not started |
 | **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Not started |
 | **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Not started |
@@ -131,13 +131,13 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement normalized dimensions, key-kind classification and white-key reference positions.
-- [ ] Implement black-key positions and width/height proportions from the Phase 0 policy.
-- [ ] Handle arbitrary ranges, partial octaves, ranges starting/ending on black notes, and single-note ranges.
-- [ ] Implement vertical layout with low notes at bottom, high at top, black keys on the left; horizontal low-left/high-right.
-- [ ] Compute key bounds and z-order for eventual SVG scene and hit testing; keep public result immutable/read-only.
-- [ ] Add deterministic fixture tests (`C3–C5`, `A0–C8`, black endpoints, one black key, `0–127`, extreme sizes, both orientations).
-- [ ] Assert invariants (finite nonnegative bounds, stable order, no missing keys, black-key relationships, consistent layout extents).
+- [x] Implement normalized dimensions, key-kind classification and white-key reference positions.
+- [x] Implement black-key positions and width/height proportions from the Phase 0 policy.
+- [x] Handle arbitrary ranges, partial octaves, ranges starting/ending on black notes, and single-note ranges.
+- [x] Implement vertical layout with low notes at bottom, high at top, black keys on the left; horizontal low-left/high-right.
+- [x] Compute key bounds and z-order for the SVG scene and logical hit testing. Keep the internal layout result immutable.
+- [x] Add deterministic fixture tests (`C3–C5`, `A0–C8`, black endpoints, one black key, `0–127`, extreme sizes, both orientations).
+- [x] Assert invariants (finite nonnegative bounds, stable order, no missing keys, black-key relationships, consistent layout extents).
 
 **Gate:** Geometry test matrix passes without a DOM; calculations are deterministic and documented for both orientations.
 

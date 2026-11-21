@@ -1,6 +1,6 @@
 # @pianorealm/keyboard
 
-Phase 1 provides DOM-independent note utilities and internal configuration validation for the Pianorealm keyboard visualization package. The package is private and builds a local ESM entry with TypeScript declarations.
+Phase 2 adds a DOM-independent geometry engine and logical point lookup to the Pianorealm keyboard visualization package. The private package builds a local ESM entry with TypeScript declarations for its public note utilities. [Project state](PROJECT_STATE.md)
 
 ## Development
 
@@ -32,3 +32,7 @@ The root also exports the types `NoteInput`, `NotationOptions`, and `KeyKind`. M
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
 A patch merges notation and sizing fields and replaces a range as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value and an explicit `undefined` resets it. Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. Validated configuration is returned as a frozen snapshot, and a rejected patch leaves the previous snapshot unchanged.
+
+## Internal geometry
+
+The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The next milestone is to use this layout in the shared SVG scene. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)

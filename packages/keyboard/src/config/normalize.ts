@@ -4,7 +4,7 @@ import type { NotationOptions } from '../notes/notation.js';
 import { normalizeRange } from '../notes/ranges.js';
 import type { MidiRange, NoteRange } from '../notes/ranges.js';
 
-type Orientation = 'horizontal' | 'vertical';
+export type Orientation = 'horizontal' | 'vertical';
 type SizingMode = 'container' | 'fixed';
 
 interface SizingOptions {
@@ -17,12 +17,15 @@ interface SizingOptions {
   readonly height?: number | undefined;
 }
 
-interface ResolvedSizing {
-  readonly mode: SizingMode;
+export interface KeyDimensions {
   readonly whiteKeyWidth: number;
   readonly whiteKeyHeight: number;
   readonly blackKeyWidth: number;
   readonly blackKeyHeight: number;
+}
+
+interface ResolvedSizing extends KeyDimensions {
+  readonly mode: SizingMode;
   readonly width?: number;
   readonly height?: number;
 }
@@ -62,6 +65,17 @@ function positiveDimension(value: number, name: string): number {
   return value;
 }
 
+export function validateKeyDimensions(dimensions: KeyDimensions): void {
+  const { whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight } = dimensions;
+  positiveDimension(whiteKeyWidth, 'whiteKeyWidth');
+  positiveDimension(whiteKeyHeight, 'whiteKeyHeight');
+  positiveDimension(blackKeyWidth, 'blackKeyWidth');
+  positiveDimension(blackKeyHeight, 'blackKeyHeight');
+  if (blackKeyWidth >= whiteKeyWidth || blackKeyHeight > whiteKeyHeight) {
+    throw new RangeError('Black keys must be narrower than white keys and at most as deep');
+  }
+}
+
 function resolveSizing(options: SizingOptions): ResolvedSizing {
   const {
     mode = DEFAULT_SIZING.mode,
@@ -74,13 +88,7 @@ function resolveSizing(options: SizingOptions): ResolvedSizing {
   if (mode !== 'container' && mode !== 'fixed') {
     throw new TypeError('Sizing mode must be "container" or "fixed"');
   }
-  positiveDimension(whiteKeyWidth, 'whiteKeyWidth');
-  positiveDimension(whiteKeyHeight, 'whiteKeyHeight');
-  positiveDimension(blackKeyWidth, 'blackKeyWidth');
-  positiveDimension(blackKeyHeight, 'blackKeyHeight');
-  if (blackKeyWidth >= whiteKeyWidth || blackKeyHeight > whiteKeyHeight) {
-    throw new RangeError('Black keys must be narrower than white keys and at most as deep');
-  }
+  validateKeyDimensions({ whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight });
   if (mode === 'container' && (width !== undefined || height !== undefined)) {
     throw new RangeError('Viewport width and height require fixed sizing');
   }
@@ -98,15 +106,19 @@ const DEFAULT_CONFIG: ConfigSnapshot = Object.freeze({
   sizing: DEFAULT_SIZING,
 });
 
+export function validateOrientation(orientation: Orientation): void {
+  if (orientation !== 'horizontal' && orientation !== 'vertical') {
+    throw new TypeError('Orientation must be "horizontal" or "vertical"');
+  }
+}
+
 /** Validate a configuration patch and return a new snapshot. Commit it only after success. */
 export function normalizeConfig(patch: ConfigOptions = {}, previous = DEFAULT_CONFIG): ConfigSnapshot {
   validateRecord(patch, ['range', 'orientation', 'notation', 'sizing'], 'configuration');
   const orientation = Object.hasOwn(patch, 'orientation')
     ? (patch.orientation === undefined ? DEFAULT_CONFIG.orientation : patch.orientation)
     : previous.orientation;
-  if (orientation !== 'horizontal' && orientation !== 'vertical') {
-    throw new TypeError('Orientation must be "horizontal" or "vertical"');
-  }
+  validateOrientation(orientation);
 
   let notation = previous.notation;
   if (Object.hasOwn(patch, 'notation')) {
