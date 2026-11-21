@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Package Architecture
 
-> **Status:** Proposed architecture baseline; **not an implementation report**  
+> **Status:** Accepted Phase 0 baseline; **not an implementation report**
 > **Package:** `@pianorealm/keyboard`  
 > **Scope:** Internal design for a framework-independent, display-only piano keyboard visualization library  
 > **Related:** [Ecosystem vision](../../docs/ECOSYSTEM.md) · [Ecosystem architecture](../../docs/ARCHITECTURE.md) · [Keyboard product specification](./PROJECT_SPEC.md)
@@ -298,7 +298,7 @@ Skin objects **only** describe resolved appearance: backgrounds, key fills, bord
 
 Initial skin set: `minimal`, `classic`, `modern`, `neon`, `dark`, plus a documented high-contrast skin or equivalent accessibility mode. A custom skin mechanism should accept validated appearance tokens without allowing arbitrary mutation of renderer internals.
 
-**Proposed resolution order:** internal defaults → selected skin → user appearance overrides → accessibility overrides required by explicit settings. Finalize this precedence during architecture planning, especially for high-contrast and user-provided colors.
+**Resolution order:** internal defaults → selected skin → user appearance overrides → accessibility overrides required by explicit settings. Key dimensions belong to sizing options.
 
 Keep styles scoped inside the component, including embedded and Anki usage. Avoid selectors that affect host `.card`, `body`, or generic `svg`/`rect` elements. Prefer inline SVG presentation attributes/embedded scoped styles where they improve standalone export and host isolation; define a consistent strategy so static and mounted output match. SVG definitions (gradients, filters, masks) require collision-safe IDs.
 
@@ -493,3 +493,14 @@ Create ADRs under `docs/decisions/` for ecosystem-wide contracts and under the p
 ---
 
 **Architectural baseline:** `@pianorealm/keyboard` is a portable, deterministic **visualization engine**. Its core produces geometry and visual descriptions; the static serializer turns them into standalone SVG; the mounted adapter updates browser nodes efficiently. Human interaction, MIDI transport, and audio remain independently owned capabilities composed by applications through documented public contracts.
+
+## Phase 0 review references
+
+The [Phase 0 review](docs/PHASE_0_REVIEW.md) records the audit, architecture sketch, risks and fixtures. The maintainer accepted all six ADRs on 2026-11-21. The accepted ADRs govern any earlier sketches in this document.
+
+- [Repository topology](../../docs/decisions/0001-repository-topology.md)
+- [Standalone namespace and collision policy](../../docs/decisions/0002-standalone-global-namespace.md)
+- [Notes, configuration and state](docs/decisions/0001-notes-configuration-and-state.md)
+- [Layout, sizing and hit testing](docs/decisions/0002-layout-sizing-and-hit-testing.md)
+- [Scene, safe SVG and identifiers](docs/decisions/0003-scene-safe-svg-and-identifiers.md)
+- [Lifecycle, events and embedded hosts](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)

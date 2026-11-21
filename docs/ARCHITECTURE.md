@@ -395,6 +395,8 @@ Significant cross-package decisions **SHOULD** have an Architecture Decision Rec
 0004-interaction-keyboard-integration.md
 ```
 
+Each `decisions/` directory has its own numbering sequence. Assign the next unused number in that directory and keep the filename prefix and ADR title number in sync. Use the file path when referencing records across directories.
+
 Recommended ADR sections: **Context**, **Decision**, **Alternatives**, **Consequences**, **Status**, and **Date**. Use `proposed`, `accepted`, `superseded`, or `rejected` consistently. Record both breaking decisions and the reasons for deferring a shared abstraction.
 
 For AI-assisted or phased development:

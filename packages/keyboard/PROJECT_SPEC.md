@@ -195,7 +195,7 @@ Built-in skins from the original specification:
 
 Support an additional **high-contrast accessibility skin** or equivalent documented high-contrast styling mode. Future possibilities: Vintage/Wooden, Educational/Colorful, Skeuomorphic, Monochrome.
 
-Allow user overrides of background, white/black colors, borders, dimensions, radii, shadows, gradients, labels, active state, indicators, and animation. Establish a documented custom-skin registration API; no skin should alter note identities or event semantics.
+Customize key dimensions through the sizing options in §11. Skin tokens control appearance only. Allow appearance overrides for background, white/black colors, borders, radii, shadows, gradients, labels, active state, indicators, and animation. Establish a documented custom-skin registration API. Skins preserve note identities and event semantics.
 
 Keep CSS scoped to the component; avoid global selectors, host resets, global ID collisions and unqualified names. Support transparent, inherited or explicit backgrounds and light/dark host contexts.
 
@@ -497,9 +497,9 @@ An initial stable keyboard release is acceptable only when:
 10. Documentation explains composability, Anki setup and tested-versus-untested host support.
 11. Unit/build and representative browser/visual tests pass, or all exceptions are documented before release.
 
-## 22. Open design decisions to resolve in Phase 0
+## 22. Phase 0 design topics
 
-These should be decided deliberately, rather than left as accidental implementation details:
+The [accepted Phase 0 ADRs](ARCHITECTURE.md#phase-0-review-references) record the decisions and any deferred verification for these topics:
 
 1. **Repository topology:** single package repo now versus early workspace/monorepo.
 2. **Browser global:** precise `Pianorealm.Keyboard` constructor/namespace shape and coexistence of future bundles.
