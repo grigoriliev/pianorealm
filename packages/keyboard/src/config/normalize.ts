@@ -5,6 +5,8 @@ import { defaultNotation, validateNotation } from '../notes/notation.js';
 import type { NotationOptions } from '../notes/notation.js';
 import { normalizeRange } from '../notes/ranges.js';
 import type { MidiRange, NoteRange } from '../notes/ranges.js';
+import { normalizeAnimation, resolveAnimation } from './animation.js';
+import type { AnimationOptions, ResolvedAnimation } from './animation.js';
 
 export type Orientation = 'horizontal' | 'vertical';
 type SizingMode = 'container' | 'fixed';
@@ -39,6 +41,7 @@ export interface ConfigOptions {
   readonly sizing?: SizingOptions | undefined;
   readonly skin?: string | undefined;
   readonly appearance?: AppearanceOptions | undefined;
+  readonly animation?: AnimationOptions | undefined;
 }
 
 interface ConfigSnapshot {
@@ -49,6 +52,8 @@ interface ConfigSnapshot {
   readonly skin: string;
   readonly overrides: AppearanceOptions;
   readonly appearance: ResolvedAppearance;
+  readonly animationOverrides: AnimationOptions;
+  readonly animation: ResolvedAnimation;
 }
 
 const DEFAULT_RANGE = Object.freeze({ from: 21, to: 108 });
@@ -60,7 +65,7 @@ const DEFAULT_SIZING = Object.freeze({
   blackKeyHeight: 60,
 } satisfies ResolvedSizing);
 
-export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance'] as const;
+export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance', 'animation'] as const;
 
 const SIZING_FIELDS = [...Object.keys(DEFAULT_SIZING), 'width', 'height'];
 
@@ -118,6 +123,8 @@ const DEFAULT_CONFIG: ConfigSnapshot = Object.freeze({
   skin: 'minimal',
   overrides: EMPTY_OVERRIDES,
   appearance: minimalAppearance,
+  animationOverrides: EMPTY_OVERRIDES,
+  animation: resolveAnimation('minimal', EMPTY_OVERRIDES),
 });
 
 export function validateOrientation(orientation: Orientation): void {
@@ -175,5 +182,11 @@ export function normalizeConfig(
     ? previous.appearance
     : resolveAppearance(tokens, overrides);
 
-  return Object.freeze({ orientation, notation, range, sizing, skin, overrides, appearance });
+  const animationOverrides = Object.hasOwn(patch, 'animation')
+    ? normalizeAnimation(patch.animation, previous.animationOverrides)
+    : previous.animationOverrides;
+  const animation = skin === previous.skin && animationOverrides === previous.animationOverrides
+    ? previous.animation : resolveAnimation(skin, animationOverrides);
+
+  return Object.freeze({ orientation, notation, range, sizing, skin, overrides, appearance, animationOverrides, animation });
 }

@@ -367,9 +367,9 @@ Extensions may register skins or visual contributions, subscribe to public event
 
 ## 12. Responsive and animation lifecycle
 
-The controller owns a resize coordinator that measures the container in the DOM and passes **numbers** to geometry. Use `ResizeObserver` when available; feature-detect it, avoid recursive resize loops, and provide explicit `resize()` for hosts without observer support. Batch frequent size notifications where appropriate and skip updates when effective dimensions are unchanged.
+The mounted adapter measures the host's content box and passes numeric dimensions to the SVG viewport. Intrinsic geometry stays independent of the measurement. The adapter uses a zero-footprint slot in container mode to avoid layout feedback. It uses `ResizeObserver` where available and coalesces notifications when the host supports animation frames and frame cancellation. Explicit `resize()` measures immediately. A viewport-only change reuses the drawing, including when switching sizing modes. Orientation and key-dimension changes apply new geometry to the existing nodes. Range changes rebuild the ordered key layers and their MIDI lookup together.
 
-Animation is a presentation concern (prefer CSS transitions scoped to the component). Respect `prefers-reduced-motion`; an explicit `enabled: false` must always disable motion. The mounted renderer should not require animation timers to maintain correct pressed-key state. Static SVG must show a stable final frame.
+The mounted adapter owns an instance-scoped CSS stylesheet for transitions. It enables motion through a positive `prefers-reduced-motion: no-preference` media query, so the browser handles preference changes without a subscription and unsupported hosts retain the final state. Explicit `enabled: false` or zero duration removes the transition rules. Validated animation overrides merge independently of scene appearance and preserve the same key nodes. The private serializer emits the shared scene's final fill and dot visibility attributes without the mounted stylesheet.
 
 ## 13. Accessibility and security
 

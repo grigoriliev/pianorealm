@@ -58,7 +58,9 @@ function sameDefinition(a: SceneDefinition, b: SceneDefinition | undefined): boo
   return b.kind === 'shadow' && a.opacity === b.opacity;
 }
 
-export function updateSvgAppearance(drawing: ReturnType<typeof buildSvg>, scene: KeyboardScene, prefix: string): void {
+export function updateSvg(
+  drawing: ReturnType<typeof buildSvg>, scene: KeyboardScene, prefix: string, geometryChanged = false,
+): void {
   if (scene.definitions.length !== drawing.definitions.length
     || !scene.definitions.every((definition, index) => sameDefinition(definition, drawing.definitions[index]))) {
     const defs = buildDefs(drawing.root.ownerDocument, scene, prefix);
@@ -69,11 +71,21 @@ export function updateSvgAppearance(drawing: ReturnType<typeof buildSvg>, scene:
     drawing.definitions = scene.definitions;
   }
 
+  if (geometryChanged) {
+    drawing.root.setAttribute('viewBox', rootAttributes(scene).viewBox);
+    applyAttributes(drawing.background, backgroundAttributes(scene));
+  } else {
+    drawing.background.setAttribute('fill', scene.background);
+  }
   drawing.root.setAttribute('aria-label', scene.label);
-  drawing.background.setAttribute('fill', scene.background);
   for (const key of scene.keys) {
     const nodes = drawing.keys.get(key.note)!;
-    applyAttributes(nodes.body, keyStyleAttributes(key, prefix));
+    if (geometryChanged) {
+      applyAttributes(nodes.body, keyAttributes(key, prefix));
+      applyAttributes(nodes.indicator, indicatorAttributes(key));
+    } else {
+      applyAttributes(nodes.body, keyStyleAttributes(key, prefix));
+    }
   }
 }
 

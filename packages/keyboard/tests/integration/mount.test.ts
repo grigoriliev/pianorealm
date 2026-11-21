@@ -32,13 +32,13 @@ function mount(options: Omit<KeyboardOptions, 'container'> = {}, host = containe
   return piano;
 }
 
-function setContentSize(width: number, height: number, padding = 0, border = 0): void {
-  Object.defineProperties(container, {
+function setContentSize(width: number, height: number, padding = 0, border = 0, host = container): void {
+  Object.defineProperties(host, {
     clientWidth: { configurable: true, value: Math.round(width + 2 * padding) },
     clientHeight: { configurable: true, value: Math.round(height + 2 * padding) },
     getClientRects: { configurable: true, value: () => ({ length: 1 }) },
   });
-  Object.assign(container.style, {
+  Object.assign(host.style, {
     boxSizing: border ? 'border-box' : 'content-box',
     padding: `${padding}px`,
     border: `${border}px solid black`,
@@ -196,6 +196,117 @@ describe('mounted keyboard', () => {
     expect(disconnect).toHaveBeenCalledTimes(1);
     notify();
     expect(svg()).toBeNull();
+  });
+
+  it('coalesces observer bursts, deduplicates fractional sizes and cancels stale work', () => {
+    const listeners: (() => void)[] = [];
+    const frames: FrameRequestCallback[] = [];
+    const cancelFrame = vi.fn();
+    dom.window.requestAnimationFrame = vi.fn(callback => frames.push(callback));
+    dom.window.cancelAnimationFrame = cancelFrame;
+    dom.window.ResizeObserver = class {
+      constructor(notify: () => void) { listeners.push(notify); }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    };
+    const measure = vi.spyOn(dom.window, 'getComputedStyle');
+    const piano = mount({ range: { from: 61, to: 63 } });
+    const notify = listeners[0]!;
+    setContentSize(100, 100);
+    notify();
+    setContentSize(150.5, 100.25);
+    notify();
+    notify();
+    expect(frames).toHaveLength(1);
+    expect(measure).not.toHaveBeenCalled();
+    frames[0]!(0);
+    expect(measure).toHaveBeenCalledOnce();
+    const root = svg();
+    const firstKey = root.querySelector('[data-note]');
+    expect(root.getAttribute('width')).toBe('150.5');
+    const writes = vi.spyOn(root, 'setAttribute');
+
+    setContentSize(150.50000001, 100.25);
+    notify();
+    frames[1]!(0);
+    expect(writes).not.toHaveBeenCalled();
+    setContentSize(0.125, 0.25);
+    notify();
+    piano.resize();
+    expect(cancelFrame).toHaveBeenLastCalledWith(3);
+    expect(root.getAttribute('width')).toBe('0.125');
+    expect(root.getAttribute('height')).toBe('0.25');
+    expect(root.querySelector('[data-note]')).toBe(firstKey);
+    measure.mockClear();
+    frames[2]!(0);
+    expect(measure).not.toHaveBeenCalled();
+
+    notify();
+    piano.setOptions({ sizing: { mode: 'fixed', width: 200 } });
+    expect(cancelFrame).toHaveBeenLastCalledWith(4);
+    expect(svg()).toBe(root);
+    expect(root.getAttribute('width')).toBe('200');
+    notify();
+    frames[3]!(0);
+    expect(frames).toHaveLength(4);
+    expect(measure).not.toHaveBeenCalled();
+
+    piano.setOptions({ sizing: undefined });
+    listeners[1]!();
+    piano.destroy();
+    expect(cancelFrame).toHaveBeenLastCalledWith(5);
+    measure.mockClear();
+    frames[4]!(0);
+    listeners[1]!();
+    expect(measure).not.toHaveBeenCalled();
+    expect(svg()).toBeNull();
+  });
+
+  it('measures independent hosts without optional APIs and preserves keys through viewport changes', () => {
+    const other = dom.window.document.getElementById('other')!;
+    setContentSize(150.5, 100, 0, 0, other);
+    setContentSize(80, 60);
+    const piano = mount({
+      range: { from: 61, to: 63 }, skin: 'classic', appearance: { pressed: '#097' },
+    });
+    mount({ range: { from: 61, to: 61 } }, other);
+    piano.setPressedKeys([0, 61, 127]);
+    const root = svg();
+    const key = root.querySelector('[data-note="61"]');
+    expect(root.getAttribute('width')).toBe('80');
+    expect(svg(other).getAttribute('width')).toBe('150.5');
+    piano.setOptions({ sizing: { mode: 'fixed', width: 122, height: 110 } });
+    piano.setOptions({ sizing: { width: 122.0000001 } });
+    expect(svg()).toBe(root);
+    expect(root.getAttribute('width')).toBe('122.0000001');
+    expect(root.getAttribute('height')).toBe('110');
+    expect(root.querySelector('[data-note="61"]')).toBe(key);
+    piano.setOptions({ sizing: undefined });
+    expect(svg()).toBe(root);
+    expect(root.getAttribute('width')).toBe('80');
+    const dot = root.querySelector('circle');
+    piano.setOrientation('vertical');
+    expect(svg()).toBe(root);
+    expect(root.getAttribute('viewBox')).toBe('0 0 100 32');
+    expect(root.querySelector('[data-note="61"]')).toBe(key);
+    expect(root.querySelector('circle')).toBe(dot);
+    expect(key?.getAttribute('width')).toBe('60');
+    expect(key?.getAttribute('y')).toBe('20');
+    expect(root.querySelector('linearGradient')?.getAttribute('y2')).toBe('0');
+    expect(visiblePressed(svg(), '#097')).toEqual([61]);
+    expect(svg().querySelectorAll('linearGradient')).toHaveLength(2);
+    piano.setOptions({
+      sizing: { whiteKeyWidth: 24, whiteKeyHeight: 125, blackKeyWidth: 10, blackKeyHeight: 75 },
+    });
+    expect(root.getAttribute('viewBox')).toBe('0 0 125 34');
+    expect(root.querySelector('[data-note="61"]')).toBe(key);
+    expect(key?.getAttribute('width')).toBe('75');
+    expect(key?.getAttribute('height')).toBe('10');
+    expect(key?.getAttribute('fill')).toBe('#097');
+    expect(piano.getPressedKeys()).toEqual([0, 61, 127]);
+    piano.destroy();
+    expect(svg(other).getAttribute('width')).toBe('150.5');
   });
 
   it('rolls back a failed observer setup and releases ownership for retry', () => {
@@ -563,6 +674,74 @@ describe('mounted appearance', () => {
   });
 });
 
+describe('mounted motion', () => {
+  it('scopes motion to a single mount and resolves skin changes and option resets in place', () => {
+    const other = dom.window.document.getElementById('other')!;
+    const sizing = { mode: 'fixed' } as const;
+    const piano = mount({ sizing, range: { from: 61, to: 63 } });
+    mount({ sizing, animation: { enabled: true, duration: 90, easing: 'linear' } }, other);
+    const root = svg();
+    const key = root.querySelector('[data-note="61"]')!;
+    const style = container.querySelector('style')!;
+    const otherStyle = other.querySelector('style')!;
+    const scope = root.getAttribute('data-pianorealm-motion');
+    const otherScope = svg(other).getAttribute('data-pianorealm-motion');
+    expect(scope).not.toBe(otherScope);
+    expect(style.textContent).toContain(`[data-pianorealm-motion="${scope}"] > rect[data-note]`);
+    expect(style.textContent).toContain('@media (prefers-reduced-motion: no-preference)');
+    expect(style.textContent).toContain('transition: fill 120ms ease-out');
+    expect(style.textContent).toContain('transition: opacity 120ms ease-out');
+    expect(otherStyle.textContent).toContain('90ms linear');
+    expect(otherStyle.textContent).not.toContain(scope);
+    expect(typeof dom.window.matchMedia).toBe('undefined');
+
+    piano.pressKey(0);
+    piano.pressKey(61);
+    piano.releaseKey(61);
+    piano.pressKey(61);
+    piano.setSkin('classic');
+    expect(style.textContent).toContain('160ms ease-in-out');
+    piano.setOptions({ animation: { duration: 250, easing: 'ease-in' } });
+    expect(style.textContent).toContain('250ms ease-in');
+    piano.setOptions({ animation: { enabled: false } });
+    piano.setSkin('minimal');
+    expect(style.textContent).toBe('');
+    piano.setOptions({ animation: { enabled: true } });
+    expect(style.textContent).toContain('250ms ease-in');
+    piano.setOptions({ animation: { duration: 0 } });
+    expect(style.textContent).toBe('');
+    piano.setOptions({ animation: undefined });
+    expect(style.textContent).toContain('120ms ease-out');
+    expect(piano.getPressedKeys()).toEqual([0, 61]);
+    expect(svg()).toBe(root);
+    expect(root.querySelector('[data-note="61"]')).toBe(key);
+    expect(key.getAttribute('fill')).toBe(minimalAppearance.pressed);
+    expect(root.querySelectorAll('circle[display="inline"]')).toHaveLength(1);
+    piano.destroy();
+    expect(container.querySelector('style')).toBeNull();
+    expect(otherStyle.textContent).toContain('90ms linear');
+  });
+
+  it('leaves the mounted drawing and options intact after an invalid mixed update', () => {
+    const piano = mount({ sizing: { mode: 'fixed' }, animation: { duration: 234 } });
+    piano.pressKey(61);
+    const before = container.innerHTML;
+    expect(() => piano.setOptions({
+      skin: 'classic', sizing: { width: 200 }, animation: { duration: 1001 },
+    })).toThrow(RangeError);
+    expect(container.innerHTML).toBe(before);
+    expect(piano.getPressedKeys()).toEqual([61]);
+    piano.setSkin('classic');
+    expect(container.querySelector('style')?.textContent).toContain('234ms ease-in-out');
+    expect(svg().getAttribute('width')).toBe('1040');
+  });
+});
+
+function drawingAttributes(element: Element): [string, string][] {
+  return Array.from(element.attributes, ({ name, value }): [string, string] => [name, value])
+    .filter(([name]) => name !== 'xmlns' && name !== 'data-pianorealm-motion');
+}
+
 describe('static parity', () => {
   it.each([
     { from: 60, to: 71, orientation: 'horizontal' },
@@ -579,15 +758,14 @@ describe('static parity', () => {
       serializeScene(scene, { width: scene.width, height: 135 }), 'image/svg+xml',
     ).documentElement;
 
-    const attributes = (element: Element) => Object.fromEntries(
-      Array.from(element.attributes, ({ name, value }) => [name, value]).filter(([name]) => name !== 'xmlns'),
-    );
+    const attributes = (element: Element) => Object.fromEntries(drawingAttributes(element));
     expect(staticSvg.namespaceURI).toBe(SVG_NS);
     expect(attributes(staticSvg)).toEqual(attributes(domSvg));
     expect(Array.from(staticSvg.children, attributes)).toEqual(Array.from(domSvg.children, attributes));
     expect(domSvg.firstElementChild?.getAttribute('fill')).toBe(minimalAppearance.background);
     expect(notes(staticSvg)).toEqual(layout.keys.map(key => String(key.note)));
     expect(staticSvg.querySelector('[id], style, script, [href], [tabindex]')).toBeNull();
+    expect(staticSvg.hasAttribute('data-pianorealm-motion')).toBe(false);
     expect(domSvg.querySelector('[id], style, script, [href], [tabindex]')).toBeNull();
 
     piano.setPressedKeys([0, 61, 62]);
@@ -606,8 +784,9 @@ describe('static parity', () => {
       sizing: { mode: 'fixed', width: 150, height: 200 },
       appearance: { strokeWidth: 0.5, pressed: '#097' },
     } as const;
-    const piano = mount(options);
+    const piano = mount({ ...options, orientation: 'horizontal' });
     piano.setPressedKeys([0, 61, 62, 127]);
+    piano.setOrientation(orientation);
     const config = normalizeConfig(options);
     const layout = calculateLayout(config.range, config.orientation, config.sizing);
     const scene = buildScene(config, layout, config.appearance, new Set(piano.getPressedKeys()));
@@ -619,9 +798,8 @@ describe('static parity', () => {
     const describe = (element: Element, idPrefix: string): unknown => ({
       name: element.localName,
       namespace: element.namespaceURI,
-      attributes: Object.fromEntries(Array.from(element.attributes)
-        .filter(({ name }) => name !== 'xmlns')
-        .map(({ name, value }) => [name, value.replaceAll(`${idPrefix}-`, 'keyboard-')])),
+      attributes: Object.fromEntries(drawingAttributes(element)
+        .map(([name, value]) => [name, value.replaceAll(`${idPrefix}-`, 'keyboard-')])),
       children: Array.from(element.children, child => describe(child, idPrefix)),
     });
     expect(describe(parsed, 'printed')).toEqual(describe(mounted, prefix));

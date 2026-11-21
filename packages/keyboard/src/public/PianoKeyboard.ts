@@ -43,7 +43,7 @@ export class PianoKeyboard {
     this.#config = normalizeConfig(configOptions);
     this.#layout = layoutFor(this.#config);
     const scene = buildScene(this.#config, this.#layout, this.#config.appearance, this.#pressed);
-    this.#mount = new MountedSvg(container, scene, this.#config.sizing);
+    this.#mount = new MountedSvg(container, scene, this.#config.sizing, this.#config.animation);
   }
 
   /** Atomically replace the visually pressed notes, including those outside the displayed range. */
@@ -140,13 +140,15 @@ export class PianoKeyboard {
       || sizing.blackKeyHeight !== oldSizing.blackKeyHeight;
     const changesViewport = sizing.mode !== oldSizing.mode || sizing.width !== oldSizing.width
       || sizing.height !== oldSizing.height;
-    if (changesLayout || changesViewport || notation !== previous.notation || appearance !== previous.appearance) {
-      const layout = changesLayout ? layoutFor(config) : this.#layout;
-      const scene = buildScene(config, layout, appearance, this.#pressed);
-      if (changesLayout || changesViewport) mount.replace(scene, sizing);
-      else mount.restyle(scene);
-      this.#layout = layout;
+    const changesAppearance = notation !== previous.notation || appearance !== previous.appearance;
+    const layout = changesLayout ? layoutFor(config) : this.#layout;
+    const scene = changesLayout || changesAppearance ? buildScene(config, layout, appearance, this.#pressed) : undefined;
+    if (changesLayout || changesViewport) mount.updateSizing(sizing, changesLayout ? scene : undefined);
+    if (!changesLayout && scene) mount.restyle(scene);
+    if (config.animation !== previous.animation) {
+      mount.setAnimation(config.animation);
     }
+    this.#layout = layout;
     this.#config = config;
   }
 

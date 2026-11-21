@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 5 · **Phase 5:** Complete
+> **Status:** Implementation · **Last completed phase:** Phase 6 · **Phase 6:** Complete
 > **Last verified:** 2026-11-22 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
@@ -11,6 +11,42 @@
 - Internal configuration returns a frozen snapshot after validation. A patch replaces the range as a pair, merges declared notation and sizing fields, and uses explicit `undefined` to reset values. Patched notation applies to new range names. Existing MIDI endpoints retain their identity. Dimensions live under sizing. Defaults are horizontal, MIDI 21–108, container sizing, and white/black pitch widths and depths of 20 × 100 and 12 × 60. [Note and configuration ADR](docs/decisions/0001-notes-configuration-and-state.md) · [Layout and sizing ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
+
+## Phase 6 handoff
+
+The [Phase 6 completion gate](prompts/01-implementation/phase-06-responsive-sizing-animation.md#9-completion-gate) passed on HEAD `e0bb20a` with the local Phase 6 working-tree changes. Keep the working tree when resuming, including the new `src/config/animation.ts` and `src/svg/motion.ts` files. The pre-existing untracked package `.gitignore` is separate from Phase 6. Phase 7 is pending.
+
+- `src/svg/mount.ts` batches ResizeObserver work to a single measurement per frame, drops floating-point noise, and cancels pending work during explicit resize, mode switches, and teardown. A hidden or zero-size host can recover with the same drawing. Without observation the constructor and explicit `resize()` measure the host. Fixed sizing uses explicit axes or the oriented intrinsic extent. Both modes retain the accepted centered contain and clipping rules. [A-04](docs/decisions/0002-layout-sizing-and-hit-testing.md) · [A-12](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
+- `src/public/PianoKeyboard.ts` and `src/svg/dom-renderer.ts` reuse key nodes for viewport, orientation and key-dimension updates with the same range. A range change replaces the ordered key layers and their MIDI lookup. Pressed notes, including off-range notes, skin and overrides survive resizing and orientation changes. Geometry and the private serializer retain their existing coordinate and final-state attribute contracts.
+- `src/config/animation.ts`, `src/config/normalize.ts` and `src/index.ts` add the validated `animation` option and its public types. Minimal and custom skins default to 120 ms ease-out, and Classic defaults to 160 ms ease-in-out. Fields merge and reset under A-06. `src/svg/motion.ts` scopes mounted solid-fill and dot transitions to one instance, honors explicit off and zero duration, and uses CSS to respond to live motion-preference changes. Gradient-to-solid changes apply immediately. Static SVG carries the final fill and dot state with no stylesheet. [Motion API](README.md#pressed-key-motion)
+- The unit and integration tests cover invalid patches, node reuse, observer coalescing and cancellation, fractional and tiny sizes, multiple mounted instances, and static parity after live updates. The demo adds **Animate highlights** while keeping its standalone SVG downloads.
+
+### Completion criteria
+
+| Criterion | Evidence |
+| --- | --- |
+| Sizing and geometry | Phase 2 geometry fixtures pass. Mount tests cover explicit and intrinsic fixed axes, custom key dimensions, partial ranges with black-key endpoints, both orientations, and independent container measurements. Firefox checked centered contain fit in both orientations and fixed/container mode changes. |
+| Resize recovery and cost | Mount tests verify latest-size frame coalescing, equivalent-size no-ops, cancellation on explicit resize or mode switch, and safe stale callbacks. Firefox exercised tiny, fractional, hidden, and disconnected hosts and the explicit fallback without observation. |
+| State, isolation, and teardown | Mount tests verify retained skin and appearance overrides, retained off-range notes, key identity, mount rollback, and removal of instance resources. The Firefox fixture checked a second instance during resize and teardown. |
+| Motion and accessibility | Tests verify skin defaults, override merging and resets, and atomic rejection of unsafe or out-of-range options. Firefox verified interpolated solid fills, dot opacity, explicit motion-off, and live reduced-motion changes. The current fixed dot remains the pressed-state shape cue. |
+| Shared scene and static output | Parsed SVG matches mounted final-state attributes, including after an orientation update. Firefox verified transition-free SVG serialization, byte-identical downloads for all three demo mounts, and standalone rasterization of the Classic horizontal example. |
+| Package and handoff | The checks below passed. The development plan records Phase 6 as complete and identifies Phase 7 as the next milestone. |
+
+### Verification
+
+Commands ran from `packages/keyboard` with IntelliJ IDEA's Node 24.22.1 and npm 11.19.1 on `PATH`, except the Git checks ran from the repository root.
+
+| Command | Observed result |
+| --- | --- |
+| `npm test && npm run typecheck && npm run build` before edits | Passed. Vitest 4.1.12 ran 188 tests across seven files. TypeScript and Vite built the ESM and declarations. |
+| `npm test && npm run typecheck && npm run build` rerun for this handoff | Exit 0. Vitest 4.1.12 passed all 203 tests across seven files, including the Phase 2 geometry fixtures. TypeScript emitted no diagnostics. Vite 7.3.8 built `dist/pianorealm-keyboard.esm.js` and its source map, and TypeScript emitted declarations. |
+| `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022 --module NodeNext /tmp/pianorealm-phase6/consumer/node.mts` and `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022,DOM --module NodeNext /tmp/pianorealm-phase6/consumer/browser.mts` | Passed against built declarations for Node without DOM types and for a browser consumer of the animation options. |
+| `node --input-type=module` with inline assertions against the built package | Passed. Verified the four named runtime exports, C4 normalization, public instance methods, and private serializer boundary. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 /tmp/pianorealm-phase6/firefox-smoke.py dist/pianorealm-keyboard.esm.js` | Passed in headless Firefox 160.0.1. Verified a narrow padded host, fixed/container changes, centered black-endpoint fits in both orientations, fractional and subpixel observer sizing, hidden and detached recovery, explicit fallback, interpolated solid fill and dot opacity, live reduced-motion changes, CSS isolation and teardown. |
+| `python3 /tmp/pianorealm-phase6/demo/demo-smoke.py` | Passed in headless Firefox 160.0.1. Verified all three Vite demo samples, the animation checkbox, skin and appearance controls, narrow fixed-mode scrolling, and all three standalone SVG downloads. |
+| `git diff --check` and `git status --short --untracked-files=all` | Whitespace check passed. Changes are confined to the keyboard package. The pre-existing untracked package `.gitignore` was preserved. |
+
+Both Firefox checks were rerun for this handoff using temporary fixtures and local loopback access. The built ESM and declaration checks above are from the Phase 6 implementation run. Other browsers, Anki clients, assistive technologies and physical mobile devices remain untested.
 
 ## Phase 5 handoff
 
@@ -32,7 +68,7 @@ Keep the working tree when resuming. The new Phase 5 files are `src/skins/appear
 | Geometry, MIDI identity and logical state continuity | Mount tests compare node identities, bounds and MIDI order through repeated skin switches, verify off-range note retention, and assert writes only to the affected key fill and dot during a state-only update. |
 | Shared SVG, isolated definitions and cleanup | Parsed Classic SVG matches the mounted drawing after prefix normalization in both orientations. Tests cover host ID collisions, separate module copies, repeatable explicit static prefixes, definition removal, and observer cleanup. Firefox verifies gradient and shadow pixels and byte-identical downloads. |
 | Atomic updates and compatibility | Rejected mixed patches produce zero observed DOM mutations. Tests cover observer setup rollback, and package checks preserve existing APIs and build declarations. |
-| Phase boundaries and handoff | Phase 10 still tracks the remaining skins and contrast strategy. The verification and limitations below distinguish browser results from automated checks. Phase 6 is pending. |
+| Phase boundaries and handoff | Phase 10 still tracks the remaining skins and contrast strategy. The Phase 5 handoff identified Phase 6 as the next milestone. |
 
 ### Verification
 
@@ -188,10 +224,10 @@ From the repository root, `git diff --check` passed and `git status --short --un
 - The sandbox can block the esbuild install script. The offline retry used the existing npm cache and the installed native binary worked for both Vitest and Vite. This checkout also needed the IDE-provided Node runtime added to `PATH`.
 - Geometry throws `RangeError` when individually finite sizing values would make the selected range's intrinsic extent overflow. Fractional coordinates use floating-point precision. A rotated edge that rounds beyond the viewport moves inward by one floating-point step. Integer fixture coordinates are exact. With an extreme width ratio, a key's far edge can round to its start, leaving no hittable interval even though the key record retains a positive width. The Node probe reproduced this for C4–C♯4 with a black-key width of `Number.EPSILON`.
 - Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
-- Firefox 160.0.1 was the only real browser checked for Phase 5. The Phase 5 smoke covers the fixed-size demo. Container-mode switching and observer rollback are covered by DOM integration tests, with real-browser mode-transition coverage pending. Other browsers, assistive technologies and Anki clients remain unverified.
-- Observer notifications currently measure immediately and skip equivalent viewport writes. Coalescing notifications, press/release transitions and reduced-motion behavior remain Phase 6 work.
-- Configurable pressed indicators remain Phase 7 work. The public static SVG API, inline static skins, classic-script output and Anki verification remain Phase 9 work. Modern, Neon, Dark and the high-contrast strategy are tracked in Phase 10. CommonJS and optional public key bounds remain deferred.
+- Firefox 160.0.1 was the only real browser checked for Phases 5 and 6. The Phase 6 smoke adds browser evidence for mode switching. Observer setup rollback is covered by DOM integration tests. Other browsers, assistive technologies and Anki clients remain unverified.
+- Classic gradient-to-solid changes apply immediately. Hosts without ResizeObserver need explicit `resize()` after layout changes. Hosts without the reduced-motion CSS feature show the stable final state.
+- Configurable labels, pressed indicators and layered overlays remain Phase 7 work. Public events, mounted hit testing and extension lifecycle remain Phase 8 work. The public static SVG API, inline static skins, classic-script output and Anki verification remain Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS and optional public key bounds remain deferred.
 
 ## Next task
 
-Begin Phase 6 with a browser fixture that switches a pressed Classic keyboard from fixed to container sizing and back. Resize the host through fractional and zero dimensions, then restore it. Check fitted bounds, retained notes and skin, suppression of writes after destruction, and recovery through explicit `resize()` with `ResizeObserver` unavailable. Use the results to scope any sizing fixes before tackling notification coalescing and motion. [Phase 6 plan](DEVELOPMENT_PLAN.md#11-phase-6--sizing-responsiveness-and-animation)
+Begin Phase 7 — Labels, Indicators, and Layered Overlays. First review the A-07 layer order and per-key clipping rules against the current scene's fixed pressed dot. Define the initial shared-scene changes for label and indicator placement, with horizontal and vertical black-endpoint fixtures for live/static parity. [Scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md) · [Phase 7 plan](DEVELOPMENT_PLAN.md#12-phase-7--labels-indicators-and-layered-overlays)

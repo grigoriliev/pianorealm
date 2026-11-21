@@ -17,7 +17,7 @@ const keyboards = Object.entries(samples).map(([name, options]) => {
 
   const piano = new PianoKeyboard({ container, ...options, sizing: { mode: 'fixed' } });
   button.addEventListener('click', () => {
-    // Each demo host contains a single drawing. Export the whole SVG as mounted.
+    // The mounted transition sheet is outside the SVG. Export its final-state attributes.
     const svg = container.querySelector('svg');
     if (!svg) return;
 
@@ -60,5 +60,12 @@ const hideBorders = document.querySelector<HTMLInputElement>('#hide-borders');
 hideBorders?.addEventListener('change', () => {
   for (const piano of keyboards) {
     piano.setOptions({ appearance: { strokeWidth: hideBorders.checked ? 0 : undefined } });
+  }
+});
+
+const animate = document.querySelector<HTMLInputElement>('#animate-highlights');
+animate?.addEventListener('change', () => {
+  for (const piano of keyboards) {
+    piano.setOptions({ animation: { enabled: animate.checked } });
   }
 });

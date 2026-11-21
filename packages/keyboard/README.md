@@ -29,7 +29,7 @@ npm run dev:demo
 
 Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
 
-Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. The **Skin** selector and appearance checkboxes apply to all three examples. Each **Download SVG** button saves the SVG currently mounted in that card, including its skin and highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. The **Skin** selector and appearance checkboxes apply to all three examples. Turn off **Animate highlights** to apply fills and pressed dots immediately. Each **Download SVG** button saves the final appearance, including the selected skin and highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
 
 To check skin switching and export, highlight F♯ minor, choose **Classic**, and confirm each example keeps three pressed dots. Download a Classic SVG and open it on its own to check the gradient, shadow and highlights. Choose **Minimal** to restore the flat fills while keeping the same notes pressed.
 
@@ -62,9 +62,11 @@ Give the HTML host an available content-box width and height for the default con
 </script>
 ```
 
-The constructor accepts `container`, `range`, `orientation`, `notation`, `sizing`, `skin` and `appearance` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
+The constructor accepts `container`, `range`, `orientation`, `notation`, `sizing`, `skin`, `appearance` and `animation` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
 
-Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected, hidden, or zero-size host waits for a usable viewport. The adapter observes size changes where `ResizeObserver` is available. Use `resize()` after a host change if observation is unavailable or you need an immediate update. In fixed mode, `sizing.width` and `sizing.height` set the viewport in CSS pixels, with each omitted dimension taken from the oriented geometry. Fixed keyboards can be constructed while their host is detached.
+Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected host or one without a positive layout box waits for a usable viewport. Set the host's dimensions through CSS. The drawing contributes no intrinsic size to the host in container mode. The adapter observes size changes with `ResizeObserver` and batches notifications into one measurement per frame when frame scheduling is available. For hosts without observation, call `resize()` after attachment, visibility, or size changes. `resize()` measures synchronously in either environment.
+
+In fixed mode, `sizing.width` and `sizing.height` set the viewport in CSS pixels, with each omitted dimension taken from the oriented geometry. Fixed keyboards can be constructed while their host is detached. Both modes use the same intrinsic SVG `viewBox` and centered contain fit, and clip decorative paint at the SVG boundary. Hosts can wrap fixed drawings in a CSS scroller. The package exposes no alternate fit, automatic scrolling, or configurable minimum/maximum size options. Updates to the viewport, sizing mode, orientation, and key dimensions preserve the key nodes when the range stays the same.
 
 To check fitting manually, leave the C♯4–D♯4 range horizontal and set the host content box to 100 × 100 px. The 32 × 100 keyboard is centered with 34 px on either side. Switch to vertical and check that the 100 × 32 keyboard is centered with 34 px above and below. Set the host height to zero, call `resize()`, then restore the height and call `resize()` again. Mount a second keyboard in a separate host and verify that destroying the first leaves the second visible.
 
@@ -86,7 +88,7 @@ These methods control the drawing only. Minimal shows pressed keys with a blue f
 
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
-`setOptions(patch: KeyboardOptionsPatch)` merges individual fields in `notation`, `sizing` and `appearance`, and replaces a `range` as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
+`setOptions(patch: KeyboardOptionsPatch)` merges individual fields in `notation`, `sizing`, `appearance` and `animation`, and replaces a `range` as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
 
 Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. To return to default container sizing and remove fixed viewport dimensions, use `piano.setOptions({ sizing: undefined })`.
 
@@ -124,6 +126,20 @@ Resolution starts with Minimal defaults, applies the selected skin's tokens, and
 Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unknown names and fields, unsupported paint syntax and malformed tokens throw `TypeError`. Out-of-range numeric tokens throw `RangeError`. The root exports `BuiltInSkin`, `AppearanceOptions`, `AppearanceColor`, `KeyPaint`, `KeyGradient` and `GradientStop`.
 
 Gradient and shadow definitions travel with the SVG and use instance-specific IDs. The public static SVG API and its inline custom-skin options are scheduled for Phase 9.
+
+## Pressed-key motion
+
+```ts
+piano.setOptions({ animation: { duration: 180, easing: 'ease-in-out' } });
+piano.setOptions({ animation: { enabled: false } });
+piano.setOptions({ animation: undefined }); // Restore the selected skin's motion defaults
+```
+
+Motion is enabled by default. Minimal and custom skins use 120 ms with `ease-out`. Classic uses 160 ms with `ease-in-out`. The exported `AnimationOptions` accepts a finite duration from 0 through 1000 ms and an `AnimationEasing` of `linear`, `ease`, `ease-in`, `ease-out` or `ease-in-out`. Overrides survive skin changes. Reset an individual field with `undefined` to use the current skin's default.
+
+Mounted keyboards fade the existing pressed dot and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its dot still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
+
+`enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. Anki clients remain unverified.
 
 ## Internal geometry
 

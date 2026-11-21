@@ -11,6 +11,8 @@ describe('configuration normalization', () => {
       skin: 'minimal',
       overrides: {},
       appearance: minimalAppearance,
+      animationOverrides: {},
+      animation: { enabled: true, duration: 120, easing: 'ease-out' },
       notation: { accidentalPreference: 'sharp', octaveOffset: 0 },
       sizing: {
         mode: 'container',
@@ -58,6 +60,16 @@ describe('configuration normalization', () => {
     [{ sizing: { mode: 'fixed', width: NaN } }, RangeError],
     [{ sizing: { extra: 10 } }, TypeError],
     [{ sizing: null }, TypeError],
+    [{ animation: false }, TypeError],
+    [{ animation: null }, TypeError],
+    [{ animation: { enabled: 1 } }, TypeError],
+    [{ animation: { duration: '120' } }, TypeError],
+    [{ animation: { duration: -1 } }, RangeError],
+    [{ animation: { duration: 1001 } }, RangeError],
+    [{ animation: { duration: NaN } }, RangeError],
+    [{ animation: { duration: Infinity } }, RangeError],
+    [{ animation: { easing: 'linear; fill:red' } }, TypeError],
+    [{ animation: { delay: 0 } }, TypeError],
     [null, TypeError],
   ])('rejects invalid configuration %j', (patch, error) => {
     expect(() => normalizeConfig(patch as ConfigOptions)).toThrow(error);
@@ -94,5 +106,18 @@ describe('configuration normalization', () => {
     for (const value of [previous, previous.range, previous.notation, previous.sizing]) {
       expect(Object.isFrozen(value)).toBe(true);
     }
+  });
+
+  it('merges motion overrides and resets fields to the currently selected skin defaults', () => {
+    const previous = normalizeConfig({ animation: { duration: 1000, easing: 'linear' } });
+    const classic = normalizeConfig({ skin: 'classic', animation: { enabled: false } }, previous);
+    expect(classic.animation).toEqual({ enabled: false, duration: 1000, easing: 'linear' });
+    const reset = normalizeConfig({ animation: { duration: undefined, easing: undefined } }, classic);
+    expect(reset.animation).toEqual({ enabled: false, duration: 160, easing: 'ease-in-out' });
+    expect(normalizeConfig({ animation: undefined }, reset).animation)
+      .toEqual({ enabled: true, duration: 160, easing: 'ease-in-out' });
+    expect(normalizeConfig({ animation: { duration: 0 } }).animation.duration).toBe(0);
+    expect(Object.isFrozen(classic.animation)).toBe(true);
+    expect(Object.isFrozen(classic.animationOverrides)).toBe(true);
   });
 });

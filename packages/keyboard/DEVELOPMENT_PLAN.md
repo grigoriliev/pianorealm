@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Development Plan
 
-> **Status:** Active · **Package:** `@pianorealm/keyboard` · **Last revised:** 2026-11-21
+> **Status:** Active · **Package:** `@pianorealm/keyboard` · **Last revised:** 2026-11-22
 > **Scope:** First implementation of Pianorealm's framework-independent piano-keyboard visualization package.
 
 ## 1. Purpose and authority
@@ -78,7 +78,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Complete |
 | **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Complete |
 | **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Complete |
-| **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Not started |
+| **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Complete |
 | **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Not started |
 | **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Not started |
 | **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | Not started |
@@ -193,15 +193,15 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement container mode with `ResizeObserver` where available and a documented fallback; implement fixed mode.
-- [ ] Support width/height/key sizing, dimension limits, fit policies, clipping/scroll options selected in Phase 0.
-- [ ] Maintain sensible proportions and state across resizing and orientation changes.
-- [ ] Prevent resize loops, unnecessary full layout work, and observer/listener leaks.
-- [ ] Add press/release color and indicator transitions; configurable duration, easing, enabled/disabled, and skin defaults.
-- [ ] Respect `prefers-reduced-motion`; ensure an explicit animation-off option.
-- [ ] Test tiny/zero-size containers, reflow, fractional dimensions, rapid updates, destruction, and reduced-motion behavior in a real browser where necessary.
+- [x] Complete container mode with `ResizeObserver` and an explicit `resize()` fallback. Verify fixed mode.
+- [x] Support the Phase 0 viewport, key dimension, contain fit, and clipping rules. Configurable size limits and automatic scrolling remain deferred under A-04.
+- [x] Preserve proportions, key identities, appearance and pressed state across resizing and orientation changes.
+- [x] Prevent layout feedback. Coalesce observer notifications, skip equivalent measurements and cancel queued work on teardown.
+- [x] Add solid-fill transitions and fixed-dot fades with validated duration, easing, on/off and skin defaults.
+- [x] Respect live `prefers-reduced-motion` changes and explicit motion-off.
+- [x] Verify tiny and zero sizes, fractional reflow, rapid updates, teardown and reduced motion in automated tests and headless Firefox.
 
-**Gate:** Both sizing modes are stable; animation is optional and accessible; resource cleanup verified.
+**Gate passed.** The package checks and Firefox fixtures verified both sizing modes, motion, instance isolation, teardown and final-state SVG. [Phase 6 evidence](PROJECT_STATE.md#phase-6-handoff)
 
 ## 12. Phase 7 — Labels, indicators, and layered overlays
 
