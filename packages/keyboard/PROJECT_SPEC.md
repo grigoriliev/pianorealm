@@ -287,14 +287,11 @@ destroy();
 
 ### Visualization and extension methods
 
-Document methods for managing overlays, subscribing/unsubscribing to events, and installing/disposal of small extensions (for example `setKeyOverlays()`, `on()`, `off()` and `use()`). Finalize method signatures and errors before coding.
+Provide `setKeyOverlays()` for overlay replacement, `on()` for typed subscriptions, and `use()` for synchronous extension setup. Subscriptions and extension installs return idempotent disposers. [Event and extension contracts](README.md#visualization-events)
 
 ### Interaction interoperability, without embedding interaction
 
-A future `@pianorealm/interaction` must not need to parse internal SVG markup or assume CSS selectors. Define a **minimal public way** to map coordinates or key identities to rendered keys. Candidate capabilities to evaluate during Phase 0:
-
-- `getNoteAtPoint(x, y)` using a documented coordinate system, **or**
-- an equivalent stable public hit-testing/key-identification abstraction.
+A future `@pianorealm/interaction` can map viewport CSS pixels to a MIDI note through `getNoteAtPoint(clientX, clientY)`. [Hit-test contract](README.md#hit-testing)
 
 Optionally expose read-only key bounds for third-party annotations. Keep these APIs narrow; do **not** expose the internal DOM tree or renderer implementation as the integration contract. Hit-testing is a visualization/layout query, **not** pointer-event handling.
 

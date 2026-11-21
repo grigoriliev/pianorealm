@@ -46,7 +46,10 @@ export class MountedSvg {
   #viewport: Viewport | null = null;
   #active = false;
 
-  constructor(container: HTMLElement, scene: KeyboardScene, sizing: MountSizing, animation: ResolvedAnimation) {
+  constructor(
+    container: HTMLElement, scene: KeyboardScene, sizing: MountSizing, animation: ResolvedAnimation,
+    private readonly onObservedResize: () => void,
+  ) {
     if (Object.hasOwn(container, mountOwner)) {
       throw new Error('Keyboard container already has a mounted instance');
     }
@@ -117,13 +120,13 @@ export class MountedSvg {
     if (this.#cancelFrame) return;
     const view = this.#container.ownerDocument.defaultView;
     if (typeof view?.requestAnimationFrame !== 'function' || typeof view.cancelAnimationFrame !== 'function') {
-      this.resize();
+      this.onObservedResize();
       return;
     }
     const frame = view.requestAnimationFrame(() => {
       if (this.#cancelFrame !== cancel) return;
       this.#cancelFrame = undefined;
-      this.resize();
+      this.onObservedResize();
     });
     const cancel = () => view.cancelAnimationFrame(frame);
     this.#cancelFrame = cancel;
@@ -181,7 +184,6 @@ export class MountedSvg {
     if (replacesKeys) {
       if (viewport && previousRoot.parentNode === slot) slot.replaceChild(drawing.root, previousRoot);
       else previousRoot.remove();
-      this.#viewport = null;
     } else if (scene) {
       updateSvg(drawing, scene, this.#ids.prefix, true);
     }
@@ -200,7 +202,7 @@ export class MountedSvg {
       this.#appearance = scene.appearance;
       this.#pressedMode = scene.pressedMode;
     }
-    this.#applyViewport(viewport);
+    this.#applyViewport(viewport, replacesKeys);
   }
 
   setAnimation(animation: ResolvedAnimation): void {
@@ -223,15 +225,40 @@ export class MountedSvg {
     this.#applyViewport(this.#measure(this.#intrinsicSize, this.#sizing));
   }
 
-  #applyViewport(viewport: Viewport | null): void {
+  get viewport(): Viewport | null {
+    return this.#viewport;
+  }
+
+  toLayoutPoint(clientX: number, clientY: number): { x: number; y: number } | null {
+    const { root } = this.#drawing;
+    if (!this.#viewport || !root.isConnected || typeof root.getScreenCTM !== 'function'
+        || root.getClientRects().length === 0) return null;
+    const style = root.ownerDocument.defaultView?.getComputedStyle(root);
+    if (style?.visibility === 'hidden' || style?.visibility === 'collapse') return null;
+    try {
+      const inverse = root.getScreenCTM()?.inverse();
+      if (!inverse) return null;
+      const x = inverse.a * clientX + inverse.c * clientY + inverse.e;
+      const y = inverse.b * clientX + inverse.d * clientY + inverse.f;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    } catch {
+      // Legacy implementations can throw when inverting a singular matrix.
+      return null;
+    }
+  }
+
+  #applyViewport(viewport: Viewport | null, replacesKeys = false): void {
     const { root } = this.#drawing;
     if (!viewport) {
       root.remove();
       this.#viewport = null;
     } else {
-      if (!sameViewport(viewport, this.#viewport, this.#sizing.mode)) {
+      const previous = this.#viewport;
+      if (previous && sameViewport(viewport, previous, this.#sizing.mode)) {
+        if (replacesKeys) sizeSvg(root, previous);
+      } else {
         sizeSvg(root, viewport);
-        this.#viewport = viewport;
+        this.#viewport = Object.freeze(viewport);
       }
       if (root.parentNode !== this.#slot) {
         this.#slot.appendChild(root);
@@ -239,11 +266,21 @@ export class MountedSvg {
     }
   }
 
-  destroy(): void {
+  stopObserving(): void {
+    if (!this.#active) return;
     this.#active = false;
     try {
       this.#cancelResize();
-      this.#observer?.disconnect();
+    } finally {
+      const observer = this.#observer;
+      this.#observer = undefined;
+      observer?.disconnect();
+    }
+  }
+
+  destroy(): void {
+    try {
+      this.stopObserving();
     } finally {
       this.#ids.release();
       this.#drawing.root.remove();

@@ -80,7 +80,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Complete |
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Complete |
 | **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Complete |
-| **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Not started |
+| **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Complete |
 | **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | Not started |
 | **10** | Release hardening and publication prep | 1–9 | Complete release gates, docs, playground, QA | Not started |
 
@@ -225,15 +225,15 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement typed events (as finalized): `pressedKeysChanged`, `rangeChanged`, `orientationChanged`, `skinChanged`, `resized`, `destroyed`.
-- [ ] Implement subscription/unsubscription, immutable/useful payloads, deterministic event ordering, and final no-op semantics.
-- [ ] Expose the narrow public hit-test surface from Phase 0; black keys should win overlapping hit regions.
-- [ ] Implement a minimal `use()`/extension lifecycle with owned disposables and cleanup; support skin/overlay registration through documented APIs if adopted.
-- [ ] Prevent extensions from mutating internal DOM/layout state directly.
-- [ ] Test listener removal, extension destroy, event payloads, error isolation policy, multiple instances, and hit-testing under scaling and both orientations.
-- [ ] Write a short **illustrative** composition example for future interaction/MIDI/audio; no implementation or dependency on those packages.
+- [x] Implement typed events (as finalized): `pressedKeysChanged`, `rangeChanged`, `orientationChanged`, `skinChanged`, `resized`, `destroyed`.
+- [x] Implement subscription/unsubscription, immutable/useful payloads, deterministic event ordering, and final no-op semantics.
+- [x] Expose the narrow public hit-test surface from Phase 0; black keys should win overlapping hit regions.
+- [x] Implement a minimal `use()`/extension lifecycle with owned disposables and cleanup; support skin/overlay registration through documented APIs if adopted.
+- [x] Prevent extensions from mutating internal DOM/layout state directly.
+- [x] Test listener removal, extension destroy, event payloads, error isolation policy, multiple instances, and hit-testing under scaling and both orientations.
+- [x] Write a short **illustrative** composition example for future interaction/MIDI/audio; no implementation or dependency on those packages.
 
-**Gate:** External consumers can observe visual-state changes and map locations to notes without relying on private SVG internals.
+**Gate passed.** Tests verify visualization subscriptions, extension cleanup, and geometry-backed lookup through documented public methods. Firefox verified actual SVG coordinate mapping at two device pixel ratios. [Phase 8 evidence](PROJECT_STATE.md#phase-8-handoff)
 
 ## 14. Phase 9 — Static SVG, offline bundles, and Anki integration
 

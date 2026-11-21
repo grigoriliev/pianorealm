@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PianoKeyboard } from '../../src/index.js';
-import type { KeyboardOptions, KeyboardOptionsPatch, NoteInput } from '../../src/index.js';
+import type { KeyboardEventMap, KeyboardExtension, KeyboardOptions, KeyboardOptionsPatch, NoteInput } from '../../src/index.js';
 import { calculateLayout } from '../../src/geometry/layout.js';
 import { normalizeConfig } from '../../src/config/normalize.js';
 import { buildScene } from '../../src/scene/build-scene.js';
@@ -1024,5 +1024,411 @@ describe('visual annotations', () => {
     const css = container.querySelector('style')?.textContent;
     expect(css).toContain('@media (prefers-reduced-motion: no-preference)');
     expect(css).toContain('> [data-pressed-indicator]');
+  });
+});
+
+describe('visualization events', () => {
+  it('delivers frozen committed snapshots in transaction order and preserves off-range pressed notes', () => {
+    const errors = vi.fn();
+    const piano = mount({
+      range: { from: 60, to: 62 }, sizing: { mode: 'fixed' }, onCallbackError: errors,
+    });
+    const log: unknown[] = [];
+    const pressed: KeyboardEventMap['pressedKeysChanged'][] = [];
+    piano.on('pressedKeysChanged', notes => {
+      const root = svg();
+      expect(visiblePressed(root)).toEqual([60]);
+      expect(piano.getPressedKeys()).toEqual(notes);
+      expect(Object.isFrozen(notes)).toBe(true);
+      pressed.push(notes);
+    });
+    const root = svg();
+    piano.setPressedKeys([127, 60, 'C4']);
+    expect(svg()).toBe(root);
+    expect(pressed).toEqual([[60, 127]]);
+
+    let committedRange: KeyboardEventMap['rangeChanged'] | undefined;
+    piano.on('rangeChanged', range => {
+      committedRange = range;
+      expect(Object.isFrozen(range)).toBe(true);
+      expect(svg().getAttribute('viewBox')).toBe('0 0 100 32');
+      expect(svg().getAttribute('height')).toBe('32');
+      expect(piano.getPressedKeys()).toEqual([60, 127]);
+      log.push(['range', range]);
+    });
+    piano.on('orientationChanged', value => log.push(['orientation', value]));
+    piano.on('skinChanged', value => log.push(['skin', value]));
+    piano.on('resized', value => {
+      expect(Object.isFrozen(value)).toBe(true);
+      log.push(['viewport', value]);
+    });
+    piano.setOptions({ range: { from: 61, to: 63 }, orientation: 'vertical', skin: 'classic' });
+    expect(log).toEqual([
+      ['range', { from: 61, to: 63 }],
+      ['orientation', 'vertical'],
+      ['skin', 'classic'],
+      ['viewport', { width: 100, height: 32 }],
+    ]);
+    expect(committedRange).toEqual({ from: 61, to: 63 });
+    expect(errors).not.toHaveBeenCalled();
+    expect(pressed).toEqual([[60, 127]]);
+  });
+
+  it('skips no-ops, rejected changes and drawing replacements with the same viewport', () => {
+    const piano = mount({
+      range: { from: 60, to: 62 }, sizing: { mode: 'fixed', width: 200, height: 100 },
+    });
+    const pressed = vi.fn();
+    const range = vi.fn();
+    const orientation = vi.fn();
+    const skin = vi.fn();
+    const resized = vi.fn();
+    piano.on('pressedKeysChanged', pressed);
+    piano.on('rangeChanged', range);
+    piano.on('orientationChanged', orientation);
+    piano.on('skinChanged', skin);
+    piano.on('resized', resized);
+    expect(() => piano.on('toString' as keyof KeyboardEventMap, vi.fn())).toThrow(TypeError);
+    expect(() => piano.on('resized', null as never)).toThrow(TypeError);
+    expect(() => mount({ onCallbackError: 1 as never })).toThrow(TypeError);
+    piano.pressKey(60);
+    piano.pressKey('C4');
+    piano.setPressedKeys([60, 'B#3']);
+    piano.releaseKey(61);
+    expect(() => piano.setPressedKeys([61, 128])).toThrow(RangeError);
+    expect(() => piano.setOptions({ skin: 'classic', range: { from: 62, to: 60 } })).toThrow(RangeError);
+    expect(() => piano.setSkin('missing')).toThrow(TypeError);
+    piano.setSkin('minimal');
+    piano.registerSkin('blue', { pressed: '#0088ff' });
+    piano.setOptions({ appearance: { pressed: '#0000ff' } });
+    piano.setRange('C4', 'D4');
+    piano.setOrientation('horizontal');
+    piano.resize();
+    expect(pressed.mock.calls).toEqual([[[60]]]);
+    expect(range).not.toHaveBeenCalled();
+    expect(orientation).not.toHaveBeenCalled();
+    expect(skin).not.toHaveBeenCalled();
+    const root = svg();
+    piano.setRange(61, 63);
+    expect(svg()).not.toBe(root);
+    expect(svg().getAttribute('width')).toBe('200');
+    expect(range.mock.calls).toEqual([[{ from: 61, to: 63 }]]);
+    expect(resized).not.toHaveBeenCalled();
+    piano.releaseKey(60);
+    piano.clearPressedKeys();
+    expect(pressed.mock.calls).toEqual([[[60]], [[]]]);
+  });
+
+  it('applies subscription changes at the next event and guards reentrant writes in delivery and reporting', () => {
+    const log: string[] = [];
+    const listenerError = new Error('listener');
+    const reporter = vi.fn(function (this: unknown, error: unknown) {
+      expect(this).toBeUndefined();
+      expect(() => piano.pressKey(61)).toThrow(/during event delivery/);
+      log.push('reported');
+      throw error;
+    });
+    const piano = mount({ sizing: { mode: 'fixed' }, onCallbackError: reporter });
+    const other = mount({}, dom.window.document.getElementById('other')!);
+    const otherListener = vi.fn();
+    other.on('pressedKeysChanged', otherListener);
+    const first = piano.on('pressedKeysChanged', () => {
+      first();
+      second();
+      piano.on('pressedKeysChanged', () => log.push('new'));
+      expect(piano.getPressedKeys()).toEqual([60]);
+      expect(() => piano.setOrientation('vertical')).toThrow(/during event delivery/);
+      expect(() => piano.resize()).toThrow(/during event delivery/);
+      expect(() => piano.use(() => {})).toThrow(/during event delivery/);
+      expect(() => piano.destroy()).toThrow(/during event delivery/);
+      log.push('first');
+      throw listenerError;
+    });
+    const second = piano.on('pressedKeysChanged', () => log.push('second'));
+    piano.on('pressedKeysChanged', () => log.push('third'));
+    piano.pressKey(60);
+    first();
+    second();
+    piano.releaseKey(60);
+    expect(log).toEqual(['first', 'reported', 'second', 'third', 'third', 'new']);
+    expect(reporter.mock.calls).toEqual([[listenerError]]);
+    expect(otherListener).not.toHaveBeenCalled();
+  });
+
+  it('uses the host console when no reporter is supplied and continues delivery', () => {
+    const log = vi.spyOn(dom.window.console, 'error').mockImplementation(() => {});
+    const piano = mount();
+    const error = new Error('listener failure');
+    piano.on('pressedKeysChanged', () => { throw error; });
+    const next = vi.fn();
+    piano.on('pressedKeysChanged', next);
+    piano.pressKey(60);
+    expect(log).toHaveBeenCalledExactlyOnceWith(error);
+    expect(next).toHaveBeenCalledExactlyOnceWith([60]);
+  });
+
+  it('uses a fresh subscription snapshot for each event of a configuration transaction', () => {
+    const piano = mount({ sizing: { mode: 'fixed' } });
+    const removed = vi.fn();
+    const added = vi.fn();
+    const unsubscribe = piano.on('orientationChanged', removed);
+    piano.on('rangeChanged', () => {
+      unsubscribe();
+      piano.on('orientationChanged', added);
+    });
+    piano.setOptions({ range: { from: 61, to: 63 }, orientation: 'vertical' });
+    expect(removed).not.toHaveBeenCalled();
+    expect(added).toHaveBeenCalledExactlyOnceWith('vertical');
+  });
+
+  it('reports only effective observer and explicit resize changes, including unavailability', () => {
+    let notify!: () => void;
+    const disconnect = vi.fn();
+    const frames: FrameRequestCallback[] = [];
+    dom.window.requestAnimationFrame = vi.fn(callback => frames.push(callback));
+    dom.window.cancelAnimationFrame = vi.fn();
+    dom.window.ResizeObserver = class {
+      constructor(callback: () => void) { notify = callback; }
+      observe() {}
+      disconnect = disconnect;
+    };
+    const piano = mount();
+    const listener = vi.fn();
+    piano.on('resized', listener);
+    expect(svg()).toBeNull();
+    setContentSize(100, 100);
+    notify();
+    notify();
+    expect(frames).toHaveLength(1);
+    expect(listener).not.toHaveBeenCalled();
+    frames[0](0);
+    setContentSize(100.0000001, 100);
+    piano.resize();
+    piano.setRange(61, 63);
+    expect(svg().getAttribute('width')).toBe('100');
+    setContentSize(0, 100);
+    piano.resize();
+    expect(svg()).toBeNull();
+    piano.resize();
+    setContentSize(120, 80);
+    notify();
+    frames[1](0);
+    expect(listener.mock.calls).toEqual([[{ width: 100, height: 100 }], [null], [{ width: 120, height: 80 }]]);
+    notify();
+    piano.destroy();
+    frames[2](0);
+    notify();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('public hit testing', () => {
+  function screenTransform({ a = 1, b = 0, c = 0, d = 1, e = 0, f = 0 } = {}): void {
+    Object.defineProperties(svg(), {
+      getClientRects: { configurable: true, value: () => ({ length: 1 }) },
+      getScreenCTM: {
+        configurable: true,
+        value: () => {
+          const det = a * d - b * c;
+          return {
+            inverse: () => ({
+              a: d / det, b: -b / det, c: -c / det, d: a / det,
+              e: (c * f - d * e) / det, f: (b * e - a * f) / det,
+            }),
+          };
+        },
+      },
+    });
+  }
+
+  it('maps scaled and offset viewport points to black endpoints, white keys and half-open bounds', () => {
+    const piano = mount({ range: { from: 61, to: 63 }, sizing: { mode: 'fixed', width: 200, height: 200 } });
+    screenTransform({ a: 2, d: 2, e: 80, f: 20 });
+    expect(piano.getNoteAtPoint(94, 40)).toBe(61);
+    expect(piano.getNoteAtPoint(94, 140)).toBe(62);
+    expect(piano.getNoteAtPoint(104, 40)).toBe(62);
+    expect(piano.getNoteAtPoint(120, 20)).toBe(63);
+    expect(piano.getNoteAtPoint(80, 20)).toBe(61);
+    expect(piano.getNoteAtPoint(80, 140)).toBeNull();
+    expect(piano.getNoteAtPoint(144, 40)).toBeNull();
+    expect(piano.getNoteAtPoint(94, 220)).toBeNull();
+    expect(piano.getNoteAtPoint(50, 40)).toBeNull();
+    expect(piano.getPressedKeys()).toEqual([]);
+    piano.setKeyOverlays({ 61: [{ type: 'text', text: 'annotation' }] });
+    expect(piano.getNoteAtPoint(94, 40)).toBe(61);
+  });
+
+  it('uses current layout and screen transform after orientation, sizing and range changes', () => {
+    setContentSize(100, 100);
+    const piano = mount({ range: { from: 61, to: 63 } });
+    screenTransform({ e: 34 });
+    expect(piano.getNoteAtPoint(41, 10)).toBe(61);
+    piano.setOrientation('vertical');
+    screenTransform({ f: 34 });
+    expect(piano.getNoteAtPoint(10, 60)).toBe(61);
+    expect(piano.getNoteAtPoint(10, 40)).toBe(63);
+    expect(piano.getNoteAtPoint(70, 50)).toBe(62);
+    setContentSize(200, 200);
+    piano.resize();
+    screenTransform({ a: 2, d: 2, f: 68 });
+    expect(piano.getNoteAtPoint(20, 120)).toBe(61);
+    expect(piano.getNoteAtPoint(20, 80)).toBe(63);
+    piano.setRange(63, 63);
+    screenTransform();
+    expect(piano.getNoteAtPoint(0, 0)).toBe(63);
+    expect(piano.getNoteAtPoint(60, 0)).toBeNull();
+    piano.setRange(62, 62);
+    screenTransform();
+    expect(piano.getNoteAtPoint(90, 10)).toBe(62);
+    expect(piano.getNoteAtPoint(90, 20)).toBeNull();
+  });
+
+  it('handles affine transforms, unavailable layout, invalid coordinates and destruction', () => {
+    const piano = mount({ range: { from: 60, to: 60 }, sizing: { mode: 'fixed' } });
+    expect(piano.getNoteAtPoint(0, 0)).toBeNull();
+    expect(() => piano.getNoteAtPoint('0' as never, 0)).toThrow(TypeError);
+    expect(() => piano.getNoteAtPoint(0, Infinity)).toThrow(RangeError);
+    expect(() => piano.getNoteAtPoint(NaN, 0)).toThrow(RangeError);
+    screenTransform({ a: 0, b: 1, c: -1, d: 0, e: 50, f: -20 });
+    expect(piano.getNoteAtPoint(10, -10)).toBe(60);
+    svg().style.visibility = 'hidden';
+    expect(piano.getNoteAtPoint(10, -10)).toBeNull();
+    svg().style.visibility = '';
+    screenTransform({ a: 0 });
+    expect(piano.getNoteAtPoint(10, 10)).toBeNull();
+    screenTransform();
+    container.remove();
+    expect(piano.getNoteAtPoint(10, 10)).toBeNull();
+    piano.destroy();
+    expect(() => piano.getNoteAtPoint(10, 10)).toThrow(/destroyed/);
+  });
+});
+
+describe('visualization extensions', () => {
+  it('installs through public APIs and disposes subscriptions individually and per instance', () => {
+    const piano = mount({ sizing: { mode: 'fixed' } });
+    const other = mount({}, dom.window.document.getElementById('other')!);
+    const listener = vi.fn();
+    const cleanup = vi.fn();
+    const extension: KeyboardExtension = keyboard => {
+      const unsubscribe = keyboard.on('pressedKeysChanged', listener);
+      return () => { unsubscribe(); cleanup(); };
+    };
+    piano.use(keyboard => {
+      keyboard.registerSkin('extension-skin', { white: '#eeeeee' });
+      keyboard.setSkin('extension-skin');
+      keyboard.setKeyOverlays({ 60: [{ type: 'text', text: 'Example' }] });
+    });
+    expect(svg().textContent).toContain('Example');
+    expect(svg().querySelector('[data-note="60"]')?.getAttribute('fill')).toBe('#eeeeee');
+    const remove = piano.use(extension);
+    piano.use(extension);
+    other.use(extension);
+    piano.pressKey(60);
+    expect(listener).toHaveBeenCalledTimes(2);
+    remove();
+    remove();
+    piano.pressKey(62);
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    piano.destroy();
+    expect(cleanup).toHaveBeenCalledTimes(2);
+    other.pressKey(60);
+    expect(listener).toHaveBeenCalledTimes(4);
+    other.destroy();
+    expect(cleanup).toHaveBeenCalledTimes(3);
+  });
+
+  it('lets failed setup release its own partial resources and leaves the keyboard usable', () => {
+    const piano = mount();
+    const listener = vi.fn();
+    const cleanup = vi.fn();
+    const failure = new Error('setup failed');
+    expect(() => piano.use(keyboard => {
+      const unsubscribe = keyboard.on('pressedKeysChanged', listener);
+      try {
+        throw failure;
+      } catch (error) {
+        unsubscribe();
+        cleanup();
+        throw error;
+      }
+    })).toThrow(failure);
+    expect(() => piano.use({} as never)).toThrow(TypeError);
+    expect(() => piano.use(() => ({}) as never)).toThrow(TypeError);
+    piano.pressKey(60);
+    expect(listener).not.toHaveBeenCalled();
+    const remove = piano.use(() => cleanup);
+    remove();
+    const reinstall = piano.use(() => cleanup);
+    piano.destroy();
+    reinstall();
+    expect(cleanup).toHaveBeenCalledTimes(3);
+    expect(() => piano.use(() => {})).toThrow(/destroyed/);
+    expect(() => piano.on('destroyed', listener)).toThrow(/destroyed/);
+  });
+
+  it('allows removal during delivery and applies subscription changes to the next event', () => {
+    const piano = mount();
+    const listener = vi.fn();
+    piano.on('pressedKeysChanged', () => remove());
+    const remove = piano.use(keyboard => keyboard.on('pressedKeysChanged', listener));
+    piano.pressKey(60);
+    piano.releaseKey(60);
+    expect(listener).toHaveBeenCalledExactlyOnceWith([60]);
+  });
+
+  it('cleans up if setup destroys the instance before returning its disposer', () => {
+    const piano = mount();
+    const cleanup = vi.fn();
+    const remove = piano.use(keyboard => {
+      keyboard.destroy();
+      return cleanup;
+    });
+    remove();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops observation, cleans up in reverse order and delivers the teardown-start snapshot once', () => {
+    const order: string[] = [];
+    const failure = new Error('cleanup failed');
+    const reporter = vi.fn(() => {
+      order.push('report');
+      throw new Error('reporting failed');
+    });
+    dom.window.ResizeObserver = class {
+      observe() {}
+      disconnect() { order.push('disconnect'); }
+    };
+    setContentSize(100, 100);
+    const piano = mount({ onCallbackError: reporter });
+    const first = vi.fn(() => order.push('first cleanup'));
+    const removeFirst = piano.use(() => first);
+    const unsubscribe = piano.on('destroyed', value => {
+      expect(value).toBeUndefined();
+      expect(svg()).toBeNull();
+      expect(() => piano.getPressedKeys()).toThrow(/destroyed/);
+      expect(() => piano.destroy()).toThrow(/during event delivery/);
+      expect(() => piano.on('destroyed', vi.fn())).toThrow(/destroyed/);
+      order.push('destroyed');
+    });
+    const removeSecond = piano.use(() => () => {
+      expect(svg()).toBeTruthy();
+      expect(() => piano.getPressedKeys()).toThrow(/destroyed/);
+      unsubscribe();
+      order.push('second cleanup');
+      throw failure;
+    });
+    piano.on('destroyed', () => order.push('last listener'));
+    piano.destroy();
+    removeSecond();
+    removeFirst();
+    unsubscribe();
+    piano.destroy();
+    expect(order).toEqual(['disconnect', 'second cleanup', 'report', 'first cleanup', 'destroyed', 'last listener']);
+    expect(reporter.mock.calls).toEqual([[failure]]);
+    const replacement = new PianoKeyboard({ container, sizing: { mode: 'fixed' } });
+    replacement.destroy();
   });
 });

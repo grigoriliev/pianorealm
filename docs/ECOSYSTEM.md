@@ -32,7 +32,7 @@ The ecosystem begins with **`@pianorealm/keyboard`**, a display-only SVG piano k
 | Package | Role | Status | Scope |
 | --- | --- | --- | --- |
 | **`@pianorealm/keyboard`** | Visualize piano keys and visual note state | **First package — specified, not assumed implemented** | Geometry, SVG rendering, note/range utilities needed for display, skins, labels, overlays, responsive layouts, static SVG |
-| **`@pianorealm/interaction`** | Interpret human input | **Planned** | Pointer, mouse, touch, and computer-keyboard input; hit-testing and gesture-to-note mapping |
+| **`@pianorealm/interaction`** | Interpret human input | **Planned** | Pointer, mouse, touch, and computer-keyboard input, including gesture-to-note mapping using public geometry queries |
 | **`@pianorealm/midi`** | Communicate with MIDI devices | **Planned** | MIDI input/output, device discovery and lifecycle, message mapping |
 | **`@pianorealm/audio`** | Produce and manage sound | **Planned** | Audio playback, synthesis or samples, voice management, scheduling, and audio lifecycle |
 
@@ -215,7 +215,7 @@ Anki or another embedded host can display a self-contained diagram without depen
 - Cross-package integrations should have smoke tests in a minimal consumer application before being considered stable.
 - Public API breaking changes should be documented with migration guidance.
 
-For `keyboard`, a potential future integration contract is public hit-testing (for example `getNoteAtPoint(...)`), with a documented coordinate system. **The final method name, signature, and behavior must be decided during keyboard architecture planning**; this document does not freeze them.
+Keyboard provides `getNoteAtPoint(clientX, clientY)` for hit testing in viewport CSS pixels. [Keyboard hit-testing contract](../packages/keyboard/README.md#hit-testing)
 
 ## 8. Distribution and naming
 

@@ -228,13 +228,7 @@ Tests MUST cover octave boundaries, enharmonic aliases, full MIDI bounds, invali
 
 ### 6.4 Hit testing for future interaction
 
-A future interaction package needs key identification **without** parsing SVG nodes. Recommend a pure geometry query backed by the same key bounds. Possible public form (not finalized):
-
-```ts
-piano.getNoteAtPoint(x, y): number | null;
-```
-
-Before publishing, define whether coordinates are container-local CSS pixels, SVG user units, or another system; whether transformed/scaled layouts are accounted for; and how overlapping white/black keys prioritize the **visually topmost** black key. Pointer listeners themselves remain outside the package. Optional read-only bounds may be exposed only if justified by a real integration use case.
+A future interaction adapter can call `getNoteAtPoint(clientX, clientY): number | null` with viewport CSS pixels. The query shares rendered key bounds and prioritizes the topmost black key. The caller owns input listeners and gesture handling. Optional read-only bounds require a demonstrated use case. [Hit-test contract](README.md#hit-testing)
 
 ## 7. Shared scene and two SVG output paths
 
@@ -344,7 +338,7 @@ class PianoKeyboard {
 }
 ```
 
-Also design narrow public surfaces for overlays, typed events, extension installation, and (if approved) hit testing. Publish public types via the package root or intentionally documented subpath exports; consumers **MUST NOT** depend on `src/` paths. Keep validation and error naming consistent across constructor and mutators. Decide whether use-after-`destroy()` throws or is a no-op; `destroy()` itself is recommended to be idempotent.
+The public controller includes overlay replacement, typed events, extension installation, and hit testing. Types are published at the package root. The controller rejects use after destruction, with idempotent `destroy()` and returned disposers as the lifecycle exceptions. [Public API](README.md#visualization-events)
 
 ### Construction and failure cases
 
@@ -352,18 +346,11 @@ Mounted construction requires a valid DOM container and enough dimensions to ren
 
 ## 11. Events and extension lifecycle
 
-A small typed emitter should support subscribing/unsubscribing to **visualization** events such as:
+The controller commits each visualization change before dispatching snapshots through a per-instance emitter. Observer notifications use the same resize transaction as explicit `resize()`. Effective viewport dimensions come from the mounted adapter, which coalesces measurement noise. Pressed-note changes use targeted key updates before notification. Event delivery guards against reentrant keyboard mutation. [Event order and payloads](README.md#visualization-events) · [A-10](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
 
-- `pressedKeysChanged`
-- `rangeChanged`
-- `orientationChanged`
-- `skinChanged`
-- `resized`
-- `destroyed`
+The controller runs extension setup with the public keyboard façade and tracks returned cleanups. The extension owns partial setup rollback and retains any subscription disposers it needs. Destruction snapshots listeners at teardown start, stops observation, and marks the instance destroyed before extension cleanup. Final notification follows SVG and mount ownership release. [Extension contract](README.md#extensions)
 
-Public events MUST NOT impersonate pointer gestures, MIDI note-on/off, or audio voice activity. Payloads should be plain immutable data and represent the **committed new state**. Finalize no-op emission, event order, sync/async delivery, errors in listeners, and teardown timing before publishing event contracts. Prefer `on(...)` returning an unsubscribe function or equivalent explicit `off(...)` support.
-
-Extensions may register skins or visual contributions, subscribe to public events, and release their own resources. Define a small `init / dispose` protocol and ensure extension disposal occurs during keyboard destruction. Reject cycles, hidden DOM patching, and a generalized dependency-injection/plugin framework in version 1.
+The mounted adapter inverts the SVG root's screen transform from viewport CSS pixels to SVG user units. The controller queries the same immutable layout used for rendering, so both orientations retain the pure geometry engine's half-open bounds and black-key precedence. [Hit-test contract](README.md#hit-testing) · [A-09](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 
 ## 12. Responsive and animation lifecycle
 
@@ -466,7 +453,7 @@ These steps are **sequencing guidance**, not permission to omit original require
 | Geometry units and fit behavior | Cross-renderer parity | SVG user units aligned to CSS-pixel-equivalent viewport |
 | Out-of-range pressed state | State continuity | Retain normalized valid MIDI notes; render visible subset |
 | `setOptions()` semantics | Predictable updates | Validate first; merge known nested objects; replace arrays |
-| Public hit-test coordinates | Future `interaction` package | Document container-local coordinates and z-order |
+| Public hit-test coordinates | Future `interaction` package | Use viewport CSS pixels and apply the layout's z-order |
 | Scene representation and ID generation | Static/live consistency | Pure scene + deterministic static IDs / per-instance DOM IDs |
 | Skin override precedence | Styling and accessibility | Defaults → skin → user override → explicit accessibility policy |
 | Event batching and error semantics | Public API stability | Post-commit events; documented no-op behavior |

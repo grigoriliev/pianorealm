@@ -184,18 +184,9 @@ interaction.onNoteAction((action) => {
 - Optional public events for keyboard-domain changes, never implicit musical commands.
 - A static SVG path sharing geometry and appearance logic with the live renderer.
 
-### 6.1 Hit-testing contract to design
+### 6.1 Hit-testing contract
 
-Before `interaction` relies on keyboard, the keyboard package must specify:
-
-1. How coordinates are supplied: viewport/client, container-local, or viewBox-local.
-2. How transforms, scrolling, scaling, orientation, and device pixel ratio affect results.
-3. Black-key precedence in overlapping regions.
-4. Whether clipped/hidden keys are hittable.
-5. Behavior outside the key area, at boundaries, and after destruction.
-6. Whether the result is a MIDI note or includes additional geometry metadata.
-
-A possible name is `getNoteAtPoint(...)`, but **the method name, arguments, and return type are not yet approved**. Hit testing should use the geometry model, not document-wide element queries.
+Keyboard exposes `getNoteAtPoint(clientX, clientY): number | null` in viewport CSS pixels. The mounted adapter maps through the SVG screen transform to the layout's half-open key rectangles, with black-key precedence. Gesture mapping and input listeners belong to the caller. [Keyboard hit-testing contract](../packages/keyboard/README.md#hit-testing) · [Layout ADR](../packages/keyboard/docs/decisions/0002-layout-sizing-and-hit-testing.md)
 
 ### 6.2 Internal rendering boundaries that integrations must respect
 
@@ -419,7 +410,6 @@ The following are **not yet settled** and must not be assumed by initial impleme
 | --- | --- | --- |
 | Monorepo/workspace tool or separate repos | Release automation and local linking | Before multi-package development |
 | Browser global shape and collision policy | Multiple standalone scripts sharing one page | Keyboard packaging design |
-| Keyboard hit-test signature/coordinate system | Future interaction adapters | Keyboard Phase 0, before public commitment |
 | `interaction` dependency vs. optional adapter | Independent reuse and peer versioning | Interaction architecture planning |
 | Shared event/action format | Source identity, velocity, channels, timestamps | First real cross-package integration |
 | Note source aggregation strategy | Overlapping gestures/devices | First playable/MIDI-driven app |

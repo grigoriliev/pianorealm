@@ -207,6 +207,51 @@ Mounted keyboards fade pressed indicators and transition between solid key fills
 
 `enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. Anki clients remain unverified.
 
+## Visualization events
+
+`piano.on(event, handler)` returns an idempotent unsubscribe function. The exported `KeyboardEventMap` infers the handler argument from the event name.
+
+| Event | Payload |
+| --- | --- |
+| `rangeChanged` | Frozen `{ from, to }` with inclusive MIDI endpoints. |
+| `orientationChanged` | `'horizontal'` or `'vertical'`. |
+| `skinChanged` | Active built-in or custom skin name. |
+| `pressedKeysChanged` | Frozen ascending MIDI array, including off-range notes. |
+| `resized` | Frozen `{ width, height }` for the effective SVG viewport in CSS pixels, or `null` when unavailable. These are the dimensions applied by keyboard sizing before host CSS transforms or overrides. |
+| `destroyed` | `undefined`. |
+
+Events fire synchronously after the state and SVG update. Within one operation, changes are delivered in the order shown above. Each event takes a fresh snapshot of listeners in subscription order. Adding or removing a subscription during delivery takes effect on the next event. Callback code can read the mounted instance and change subscriptions. Reentrant keyboard mutations and calls to `destroy()` throw `Error` during delivery.
+
+Equivalent values and rejected updates emit no events. Appearance overrides, skin registration, and overlays do not change the selected skin. Moving notes in or out of the visible range does not change the pressed set. Explicit and observed resizes emit only when the effective viewport changes, including transitions to or from an unavailable container viewport.
+
+The constructor accepts `onCallbackError(error)` for listener and extension cleanup failures. By default the host console reports them. Delivery and cleanup continue if a callback or the error reporter throws. Destroy stops observation, marks the instance destroyed, runs extension cleanups, removes its SVG, and releases ownership of the container. It then delivers `destroyed` once to the listeners present at teardown start and clears all subscriptions. Instance methods throw after destruction. Returned disposers remain safe to call, and repeated `destroy()` is a no-op outside of event delivery.
+
+## Hit testing
+
+`piano.getNoteAtPoint(clientX, clientY): number | null` takes viewport CSS pixels, with `(0, 0)` at the top-left of the viewport. These are the same coordinates as a browser event's `clientX` and `clientY`. The query maps through the current SVG screen transform in either sizing mode and orientation. Pass the coordinates directly, including under scrolling, CSS transforms and high-DPI displays.
+
+Black keys win wherever their rectangles overlap white keys. Bounds include the top and left edges and exclude the bottom and right edges. Gaps, letterboxing, points outside the keys and unavailable or singular transforms return `null`. Overlays, corner radii, and unrelated host occlusion or clipping leave the geometric hit regions unchanged. Nonnumeric inputs throw `TypeError` and non-finite numbers throw `RangeError`.
+
+**Conceptual composition.** An application or future interaction adapter can take client coordinates from a gesture it owns and query the keyboard. If the query yields a note, the application can choose to mark it visually pressed. The application separately decides whether to invoke any MIDI or audio APIs.
+
+## Extensions
+
+`piano.use(extension)` runs a synchronous `KeyboardExtension` setup function with the public keyboard instance. Setup returns a cleanup function or `undefined`. The removal handle is idempotent. Each install runs independently, including repeated use of the same function. Reinstallation follows the same setup contract. Destroy runs active cleanups in reverse order of successful installation.
+
+```ts
+import type { KeyboardExtension } from '@pianorealm/keyboard';
+
+const reportPressed: KeyboardExtension = keyboard =>
+  keyboard.on('pressedKeysChanged', notes => console.log(notes));
+
+const removeReporter = piano.use(reportPressed);
+removeReporter();
+```
+
+Cleanup is responsible for the extension's resources, including calling its retained unsubscribe functions. Handle setup failures inside setup, release partial resources, then rethrow the error. Setup errors propagate to the caller. A non-function extension or a setup result other than a function or `undefined` throws `TypeError`. When removed during event delivery, cleanup runs immediately and subscription changes affect the next event. During keyboard teardown, cleanup can use retained disposers to release resources. If setup destroys the keyboard before returning its cleanup, the cleanup runs as soon as setup returns.
+
+Extensions can use `registerSkin()` and `setKeyOverlays()` through their existing public contracts. Registered skins belong to the keyboard instance, and overlays use whole-map replacement. Public key bounds and registration of custom overlay types are deferred.
+
 ## Internal geometry
 
 The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serializer use the same scene derived from this layout and the resolved appearance. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
