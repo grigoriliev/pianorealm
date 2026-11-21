@@ -29,9 +29,11 @@ npm run dev:demo
 
 Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
 
-Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. The **Skin** selector and appearance checkboxes apply to all three examples. Turn off **Animate highlights** to apply fills and pressed dots immediately. Each **Download SVG** button saves the final appearance, including the selected skin and highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the pressed selection on all three keyboards. **Clear highlights** releases the pressed notes. Turn off **Animate highlights** to apply fills and indicators immediately.
 
-To check skin switching and export, highlight F♯ minor, choose **Classic**, and confirm each example keeps three pressed dots. Download a Classic SVG and open it on its own to check the gradient, shadow and highlights. Choose **Minimal** to restore the flat fills while keeping the same notes pressed.
+Choose **Key labels** to compare note names, MIDI numbers, and octaves. **Emphasize C notes** adds a strip to each C key and makes its label bold when present. **Show example annotations** adds a custom “Do” label, dot, and badge on C4, an amber highlight and text overlay on E4, and a number on G4. These annotations stay in place when you release the chord or switch skins. To compare pressed styles, press a chord, choose **Indicator only**, and switch **Indicator shape** to **Square**.
+
+Each **Download SVG** button saves the current drawing with its labels, highlights, overlays, and final pressed appearance. The demo uses the source entry point and works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
 
 ## Note utilities
 
@@ -62,7 +64,7 @@ Give the HTML host an available content-box width and height for the default con
 </script>
 ```
 
-The constructor accepts `container`, `range`, `orientation`, `notation`, `sizing`, `skin`, `appearance` and `animation` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
+`KeyboardOptions` accepts the host `container`, range, orientation, notation, sizing, skin, appearance, motion, and the visual annotations documented below. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
 
 Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected host or one without a positive layout box waits for a usable viewport. Set the host's dimensions through CSS. The drawing contributes no intrinsic size to the host in container mode. The adapter observes size changes with `ResizeObserver` and batches notifications into one measurement per frame when frame scheduling is available. For hosts without observation, call `resize()` after attachment, visibility, or size changes. `resize()` measures synchronously in either environment.
 
@@ -88,13 +90,13 @@ These methods control the drawing only. Minimal shows pressed keys with a blue f
 
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
-`setOptions(patch: KeyboardOptionsPatch)` merges individual fields in `notation`, `sizing`, `appearance` and `animation`, and replaces a `range` as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
+`setOptions(patch: KeyboardOptionsPatch)` merges fields in `notation`, `sizing`, `appearance`, `animation`, `labels`, and `indicator`. It replaces the whole `range` or note map (`labels.custom`, `highlights`, `overlays`) when supplied. New range and map names use the notation in the same patch. Previously ingested notes retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
 
 Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. To return to default container sizing and remove fixed viewport dimensions, use `piano.setOptions({ sizing: undefined })`.
 
 ## Skins and appearance
 
-Choose `skin: 'minimal'` (default) or `skin: 'classic'` at construction, or call `piano.setSkin(name)` after mounting. Minimal uses flat fills and blue pressed keys. Classic uses ivory and dark gradients, small corner radii, a subtle black-key shadow, and brown pressed keys. Both show a white dot on pressed keys. Skin and appearance changes preserve the SVG root, key nodes, geometry and pressed notes, including notes outside the range.
+Choose `skin: 'minimal'` (default) or `skin: 'classic'` at construction, or call `piano.setSkin(name)` after mounting. Minimal uses flat fills and blue pressed keys. Classic uses ivory and dark gradients, small corner radii, a subtle black-key shadow, and brown pressed keys. By default, both show a white dot on pressed keys. Skin and appearance changes preserve the SVG root, key nodes, geometry and pressed notes, including notes outside the range.
 
 ```ts
 piano.setSkin('classic');
@@ -127,6 +129,70 @@ Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unkno
 
 Gradient and shadow definitions travel with the SVG and use instance-specific IDs. The public static SVG API and its inline custom-skin options are scheduled for Phase 9.
 
+## Labels, highlights, and overlays
+
+```ts
+piano.setOptions({
+  labels: { mode: 'note', emphasizeC: true, custom: { 'F#4': 'Sol' } },
+  highlights: { 64: '#e69534' },
+  pressedMode: 'indicator',
+  indicator: { shape: 'square', size: 6, opacity: 0.85 },
+});
+
+piano.setKeyOverlays({
+  C4: [
+    { type: 'circle', color: '#3498db', depth: 0.25 },
+    { type: 'badge', text: 1, color: '#fff', background: '#25344a', depth: 0.48 },
+  ],
+  E4: [{ type: 'text', text: 'Mi' }],
+  G4: [{ type: 'number', value: 5 }],
+});
+
+piano.setKeyOverlays({}); // Clear all user overlays
+```
+
+### Labels and highlights
+
+| Setting | Behavior |
+| --- | --- |
+| `labels.mode` | `'none'` (default), `'note'` for scientific pitch names such as C4, `'midi'` for 60, or `'octave'` for 4. Names and octaves follow the current notation. |
+| `labels.custom` | Per-note text takes precedence over the generated label, including in `'none'` mode. Use an empty string to suppress an individual label. |
+| `labels.emphasizeC` | Defaults to false. When enabled, C notes have bold labels if present and a teal strip at the front of the key. |
+| `highlights` | Per-note colors for the front strips. An explicit color takes precedence over C emphasis. A strip stays visible when the key is pressed. |
+
+### Pressed indicators
+
+`pressedMode` defaults to `'both'` (the skin's pressed fill and a white circle). Use `'color'` for pressed fill alone, or `'indicator'` to preserve the normal key fill and show a marker. Indicator-only mode uses a dark marker with a white outline on white keys and a white marker with a dark outline on black keys. The selection remains the same when switching modes.
+
+| `IndicatorOptions` field | Values |
+| --- | --- |
+| `shape` | `'circle'` (default) or `'square'`. |
+| `color`, `stroke` | Optional color overrides. Setting a stroke or stroke width in `'both'` mode adds an outline. |
+| `size`, `strokeWidth` | Finite nonnegative SVG user units. Size is the requested diameter or side, including the outline. The default size is fitted to the key. The default outline width, when present, is 1. Both dimensions are capped to fit. Zero size hides the marker and zero width removes the outline. |
+| `pitch`, `depth` | Fractions in [0, 1]. Defaults are 0.5 and 0.75. Pitch is relative to the clear center strip and anchors stay inset so the marker fits. |
+| `opacity` | Fraction in [0, 1], default 1. Mounted fades use this value as their visible endpoint. |
+
+### Overlay maps and placement
+
+`setKeyOverlays(map: KeyOverlays)` and the `overlays` option replace the complete map. Omitted notes and empty arrays have no overlays. Use `{}` or `setOptions({ overlays: undefined })` to clear all assignments. The package copies and validates the input before changing the drawing.
+
+All note maps accept keys such as `60` and `'C4'`. Numeric properties use canonical decimal MIDI spelling, with no leading zeros. Note names use the notation in effect at ingestion. Multiple spellings of the same MIDI note in one map are an error. Valid off-range entries remain assigned through range, orientation, notation, skin and viewport changes. Destroying the keyboard discards the assignments.
+
+| `KeyOverlay` type | Content |
+| --- | --- |
+| `'circle'` | A filled dot. `size` is the requested diameter in SVG user units, default 5, capped to fit the key. |
+| `'text'` | Literal `text`. |
+| `'number'` | Finite `value`, displayed using JavaScript's number formatting. |
+| `'badge'` | Text or a finite number in `text`, on a rounded rectangle with configurable `background` (default dark blue). The default text color is white. |
+
+All overlays support `color`, optional `pitch` and `depth` in [0, 1], and finite nonnegative `size`. For text, number and badge, `size` is the maximum font size in user units (default 8). Pitch defaults to 0.5 and depth to 0.4. Pitch increases left to right in horizontal layouts and bottom to top in vertical layouts. Depth increases rear to front, downward in horizontal layouts and rightward in vertical layouts. Overlay anchors use the full geometric key bounds.
+
+The SVG draws white bodies, black bodies, highlights, labels, pressed indicators, then overlays. Overlay groups are in ascending MIDI order. Items for one note paint in array order, so later items can cover earlier ones. Highlight, label and overlay paint clips to the owning key's geometric face. White-key clips exclude the areas occupied by black keys. Overlays near the edge can be partially or fully clipped. Labels and overlay text stay upright, shrink against an intrinsic geometry-based estimate, and are omitted below 3 user units. Container fitting scales the whole drawing, so extremely narrow hosts may still show small text. Use separate positions for marks that should remain visible together.
+
+Colors use the same hex or transparent format as `appearance`. Each note map accepts up to 128 entries, with at most 16 overlays per note. Text is limited to 64 Unicode code points and must contain valid XML characters. Markup-like characters are rendered literally. Paint URLs, unknown properties, and raw markup or arbitrary SVG elements supplied as overlay definitions are rejected. The SVG is exposed as a single named image. Decorations are hidden from assistive technology. Supply accompanying accessible text in the host when annotations convey information the reader needs.
+
+The package exports `LabelOptions`, `LabelMode`, `PressedMode`, `IndicatorOptions`, `KeyOverlay`, `KeyOverlays` and `NoteMap` as types.
+
 ## Pressed-key motion
 
 ```ts
@@ -137,7 +203,7 @@ piano.setOptions({ animation: undefined }); // Restore the selected skin's motio
 
 Motion is enabled by default. Minimal and custom skins use 120 ms with `ease-out`. Classic uses 160 ms with `ease-in-out`. The exported `AnimationOptions` accepts a finite duration from 0 through 1000 ms and an `AnimationEasing` of `linear`, `ease`, `ease-in`, `ease-out` or `ease-in-out`. Overrides survive skin changes. Reset an individual field with `undefined` to use the current skin's default.
 
-Mounted keyboards fade the existing pressed dot and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its dot still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
+Mounted keyboards fade pressed indicators and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its indicator still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
 
 `enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. Anki clients remain unverified.
 

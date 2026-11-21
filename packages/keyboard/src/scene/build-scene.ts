@@ -1,11 +1,14 @@
 import type { normalizeConfig } from '../config/normalize.js';
 import type { KeyboardLayout } from '../geometry/layout.js';
 import { formatNote } from '../notes/notation.js';
+import type { PressedMode } from '../config/decorations.js';
+import { buildDecorations, buildIndicator, clipSlot, visibleFace } from './key-decorations.js';
+import type { Bounds } from './key-decorations.js';
 import type { KeyKind } from '../notes/notation.js';
 
 import type { KeyGradient, ResolvedAppearance } from '../skins/appearance.js';
 
-export type DefinitionSlot = 'white-gradient' | 'black-gradient' | 'black-shadow';
+export type DefinitionSlot = 'white-gradient' | 'black-gradient' | 'black-shadow' | ReturnType<typeof clipSlot>;
 
 const gradientSlots = { white: 'white-gradient', black: 'black-gradient' } as const;
 type GradientSlot = typeof gradientSlots[KeyKind];
@@ -14,6 +17,7 @@ type ScenePaint = string | Readonly<{ slot: GradientSlot }>;
 export type SceneDefinition = Readonly<
   | { slot: GradientSlot; kind: 'gradient'; horizontal: boolean; stops: KeyGradient['stops'] }
   | { slot: 'black-shadow'; kind: 'shadow'; horizontal: boolean; opacity: number }
+  | { slot: ReturnType<typeof clipSlot>; kind: 'clip'; bounds: readonly Bounds[] }
 >;
 
 export interface KeyboardScene {
@@ -23,6 +27,7 @@ export interface KeyboardScene {
   readonly background: string;
   readonly definitions: readonly SceneDefinition[];
   readonly appearance: ResolvedAppearance;
+  readonly pressedMode: PressedMode;
   readonly keys: readonly SceneKey[];
 }
 
@@ -33,7 +38,8 @@ export type SceneKey = LayoutKey & Readonly<KeyPresentation> & {
   readonly strokeWidth: number;
   readonly cornerRadius: number;
   readonly shadow: boolean;
-  readonly indicator: Readonly<{ cx: number; cy: number; r: number; fill: string }>;
+  readonly indicator: ReturnType<typeof buildIndicator>;
+  readonly decorations: ReturnType<typeof buildDecorations>;
 };
 
 export interface KeyPresentation {
@@ -41,12 +47,14 @@ export interface KeyPresentation {
   indicatorDisplay: 'inline' | 'none';
 }
 
-export function keyPresentation(kind: KeyKind, appearance: ResolvedAppearance, pressed: boolean): KeyPresentation {
+export function keyPresentation(
+  kind: KeyKind, appearance: ResolvedAppearance, pressed: boolean, mode: PressedMode,
+): KeyPresentation {
   const paint = appearance[kind];
   return {
-    fill: pressed ? appearance.pressed
+    fill: pressed && mode !== 'indicator' ? appearance.pressed
       : typeof paint === 'string' ? paint : Object.freeze({ slot: gradientSlots[kind] }),
-    indicatorDisplay: pressed ? 'inline' : 'none',
+    indicatorDisplay: pressed && mode !== 'color' ? 'inline' : 'none',
   };
 }
 
@@ -75,33 +83,32 @@ export function buildScene(
     }));
   }
 
+  const neighbors = new Map(layout.keys.map(key => [key.note, key]));
+  const keys = layout.keys.map(key => Object.freeze({
+    ...key,
+    ...keyPresentation(key.kind, appearance, pressed?.has(key.note) ?? false, config.pressedMode),
+    stroke: appearance.boundary,
+    strokeWidth: appearance.strokeWidth,
+    cornerRadius: appearance.cornerRadius,
+    shadow: key.kind === 'black' && appearance.blackKeyShadow > 0,
+    indicator: buildIndicator(key, config, horizontal),
+    decorations: buildDecorations(key, config, horizontal),
+  }));
+  for (const key of keys) {
+    const { decorations } = key;
+    if (decorations.highlights.length || decorations.labels.length || decorations.overlays.length) {
+      definitions.push(Object.freeze({ slot: clipSlot(key.note), kind: 'clip', bounds: visibleFace(key, neighbors, horizontal) }));
+    }
+  }
+
   return Object.freeze({
     width: layout.width,
     height: layout.height,
-    label: `${layout.orientation === 'horizontal' ? 'Horizontal' : 'Vertical'} piano keyboard, ${notes}`,
+    label: `${horizontal ? 'Horizontal' : 'Vertical'} piano keyboard, ${notes}`,
     background: appearance.background,
     appearance,
+    pressedMode: config.pressedMode,
     definitions: Object.freeze(definitions),
-    keys: Object.freeze(layout.keys.map(key => {
-      const { x, y, width, height } = key.bounds;
-      const pitchWidth = horizontal ? width : height;
-      const depth = horizontal ? height : width;
-      // The center strip stays clear of adjacent black keys, even at equal depth.
-      const visibleWidth = key.kind === 'white' ? pitchWidth - config.sizing.blackKeyWidth : pitchWidth;
-      return Object.freeze({
-        ...key,
-        ...keyPresentation(key.kind, appearance, pressed?.has(key.note) ?? false),
-        stroke: appearance.boundary,
-        strokeWidth: appearance.strokeWidth,
-        cornerRadius: appearance.cornerRadius,
-        shadow: key.kind === 'black' && appearance.blackKeyShadow > 0,
-        indicator: Object.freeze({
-          cx: x + width * (horizontal ? 0.5 : 0.75),
-          cy: y + height * (horizontal ? 0.75 : 0.5),
-          r: Math.min(visibleWidth * 0.3, depth * 0.125),
-          fill: '#ffffff',
-        }),
-      });
-    })),
+    keys: Object.freeze(keys),
   });
 }

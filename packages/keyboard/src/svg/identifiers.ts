@@ -1,7 +1,10 @@
 import type { DefinitionSlot } from '../scene/build-scene.js';
 
 const documentAllocator = Symbol.for('@pianorealm/keyboard/svg-identifiers');
-const slots = ['white-gradient', 'black-gradient', 'black-shadow'] as const satisfies readonly DefinitionSlot[];
+const slots: readonly DefinitionSlot[] = [
+  'white-gradient', 'black-gradient', 'black-shadow',
+  ...Array.from({ length: 128 }, (_, note): DefinitionSlot => `key-clip-${note}`),
+];
 let nextStaticId = 0;
 
 interface DocumentAllocator {

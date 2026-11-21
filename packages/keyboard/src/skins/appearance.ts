@@ -59,14 +59,14 @@ export function findSkin(name: string, customSkins?: ReadonlyMap<string, Appeara
   return customSkins?.get(name);
 }
 
-function color(value: unknown, field: string): AppearanceColor {
+export function validateColor(value: unknown, field: string): AppearanceColor {
   if (typeof value !== 'string' || (value !== 'transparent' && !/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value))) {
     throw new TypeError(`${field} must be a hex color (#RGB, #RGBA, #RRGGBB or #RRGGBBAA) or "transparent"`);
   }
   return value;
 }
 
-function numberInRange(value: unknown, field: string, max = Number.MAX_VALUE): number {
+export function validateNonnegative(value: unknown, field: string, max = Number.MAX_VALUE): number {
   if (typeof value !== 'number') throw new TypeError(`${field} must be a number`);
   if (!Number.isFinite(value) || value < 0 || value > max) {
     throw new RangeError(`${field} must be finite and non-negative${max === 1 ? ' and at most 1' : ''}`);
@@ -75,7 +75,7 @@ function numberInRange(value: unknown, field: string, max = Number.MAX_VALUE): n
 }
 
 function paint(value: unknown, field: string): KeyPaint {
-  if (typeof value === 'string') return color(value, field);
+  if (typeof value === 'string') return validateColor(value, field);
   validateRecord(value, ['stops'], field);
   const { stops } = value as KeyGradient;
   if (!Array.isArray(stops) || stops.length < 2 || stops.length > 8) {
@@ -86,10 +86,10 @@ function paint(value: unknown, field: string): KeyPaint {
     const stop: GradientStop = stops[index];
     const path = `${field}.stops[${index}]`;
     validateRecord(stop, ['offset', 'color'], path);
-    const offset = numberInRange(stop.offset, `${path}.offset`, 1);
+    const offset = validateNonnegative(stop.offset, `${path}.offset`, 1);
     if (offset < previous) throw new RangeError(`${field}.stops must be ordered by offset`);
     previous = offset;
-    return Object.freeze({ offset, color: color(stop.color, `${path}.color`) });
+    return Object.freeze({ offset, color: validateColor(stop.color, `${path}.color`) });
   });
   return Object.freeze({ stops: Object.freeze(copy) });
 }
@@ -107,9 +107,9 @@ export function normalizeAppearance(
     } else if (field === 'white' || field === 'black') {
       result[field] = paint(value, path);
     } else if (field === 'strokeWidth' || field === 'cornerRadius' || field === 'blackKeyShadow') {
-      result[field] = numberInRange(value, path, field === 'blackKeyShadow' ? 1 : undefined);
+      result[field] = validateNonnegative(value, path, field === 'blackKeyShadow' ? 1 : undefined);
     } else {
-      result[field] = color(value, path);
+      result[field] = validateColor(value, path);
     }
   }
   return Object.freeze(result);

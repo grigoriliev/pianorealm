@@ -1,3 +1,4 @@
+import type { KeyOverlays } from '../config/decorations.js';
 import { CONFIG_FIELDS, normalizeConfig, validateOrientation } from '../config/normalize.js';
 import type { ConfigOptions, Orientation } from '../config/normalize.js';
 import { calculateLayout } from '../geometry/layout.js';
@@ -117,6 +118,13 @@ export class PianoKeyboard {
     this.#replace(patch);
   }
 
+  /** Replace the complete per-note overlay map. Pass an empty object to clear it. */
+  setKeyOverlays(overlays: KeyOverlays): void {
+    this.#requireMount();
+    if (overlays === undefined) throw new TypeError('Overlays must be a note map');
+    this.#replace({ overlays });
+  }
+
   resize(): void {
     this.#requireMount().resize();
   }
@@ -125,7 +133,10 @@ export class PianoKeyboard {
     const mount = this.#mount;
     this.#mount = null;
     this.#skins.clear();
-    mount?.destroy();
+    if (mount) {
+      this.#config = normalizeConfig();
+      mount.destroy();
+    }
   }
 
   #replace(patch: ConfigOptions): void {
@@ -140,9 +151,11 @@ export class PianoKeyboard {
       || sizing.blackKeyHeight !== oldSizing.blackKeyHeight;
     const changesViewport = sizing.mode !== oldSizing.mode || sizing.width !== oldSizing.width
       || sizing.height !== oldSizing.height;
-    const changesAppearance = notation !== previous.notation || appearance !== previous.appearance;
+    const changesPresentation = notation !== previous.notation || appearance !== previous.appearance
+      || config.pressedMode !== previous.pressedMode || config.indicator !== previous.indicator
+      || config.labels !== previous.labels || config.highlights !== previous.highlights || config.overlays !== previous.overlays;
     const layout = changesLayout ? layoutFor(config) : this.#layout;
-    const scene = changesLayout || changesAppearance ? buildScene(config, layout, appearance, this.#pressed) : undefined;
+    const scene = changesLayout || changesPresentation ? buildScene(config, layout, appearance, this.#pressed) : undefined;
     if (changesLayout || changesViewport) mount.updateSizing(sizing, changesLayout ? scene : undefined);
     if (!changesLayout && scene) mount.restyle(scene);
     if (config.animation !== previous.animation) {

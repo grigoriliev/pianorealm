@@ -282,15 +282,15 @@ Do not expose DOM nodes or internal CSS classes as a supported interoperability 
 
 ### 7.3 Stacking and overlays
 
-A proposed layer order, from back to front:
+Phase 7 uses the layer order in [A-07](docs/decisions/0003-scene-safe-svg-and-identifiers.md):
 
-1. Keyboard background and base white keys.
-2. Black keys above white-key bodies.
-3. Note-specific highlights and pressed coloring (applied per key, not as an accidental global occlusion layer).
-4. Labels and configured indicators.
-5. User overlays and annotations (respecting an explicit per-type order).
+1. Background, white bodies, then black bodies. Pressed fill is resolved on each body.
+2. Per-note highlight strips, then upright labels and pressed indicators.
+3. User overlays in ascending MIDI order, preserving the input array order for each note.
 
-The final scene specification must define whether an overlay clips to its key, whether it may span neighboring keys, and how it behaves on very small dimensions. Allow multiple overlays for one note; never make overlays dependent on a particular skin.
+Labels and indicator records merge under A-06. The custom label, highlight and overlay maps each replace as a whole. Map keys are decimal MIDI properties or note names interpreted with the current notation, including notation in the same configuration patch. Reject duplicate normalized notes and keep valid off-range entries. Custom labels take precedence over generated labels. C emphasis uses bold text and a default highlight strip that an explicit per-note color can override. These settings are independent of skin selection.
+
+Decorations use intrinsic coordinates. Position fractions run along pitch, from the low-note edge of the key, and depth, from the key's back edge. Clip highlights, labels and overlays to the geometric key face, subtracting black footprints from white keys. Indicators fit within a clear, inset strip to keep the shape cue intact. Text stays upright, scales down to fit a bounded text region and is omitted below the intrinsic font-size floor. The SVG remains one named image, with annotation subtrees hidden from assistive technology. See the [public configuration reference](README.md#labels-highlights-and-overlays).
 
 ## 8. Skins and styling
 

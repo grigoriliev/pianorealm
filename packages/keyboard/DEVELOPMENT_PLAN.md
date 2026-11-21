@@ -79,7 +79,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Complete |
 | **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Complete |
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Complete |
-| **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Not started |
+| **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Complete |
 | **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Not started |
 | **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | Not started |
 | **10** | Release hardening and publication prep | 1–9 | Complete release gates, docs, playground, QA | Not started |
@@ -209,15 +209,15 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement note names, MIDI labels, octave labels, custom note labels, and C-note/key highlighting.
-- [ ] Implement pressed-state modes (`color`, `indicator`, `both`) with circle/shape size, opacity, border, and position options.
-- [ ] Implement independent overlay layers (circle/dot, text, number, badge), multiple overlays per key, order, and positioning.
-- [ ] Add `setKeyOverlays` and any companion methods finalized in the architecture.
-- [ ] Validate and safely encode all user-controlled text, attributes, colors, and declarative SVG primitives; no raw unchecked SVG markup.
-- [ ] Verify readability and orientation-specific positioning, including white/black keys and narrow embedded sizes.
-- [ ] Test overlay replacement, skin changes, pressed state interactions, scene/static serialization compatibility, and unsafe input cases.
+- [x] Implement note names, MIDI labels, octave labels, custom note labels, and C-note/key highlighting.
+- [x] Implement pressed-state modes (`color`, `indicator`, `both`) with circle/shape size, opacity, border, and position options.
+- [x] Implement independent overlay layers (circle/dot, text, number, badge), multiple overlays per key, order, and positioning.
+- [x] Add `setKeyOverlays` and any companion methods finalized in the architecture.
+- [x] Validate and safely encode all user-controlled text, attributes, colors, and declarative SVG primitives; no raw unchecked SVG markup.
+- [x] Verify readability and orientation-specific positioning, including white/black keys and narrow embedded sizes.
+- [x] Test overlay replacement, skin changes, pressed state interactions, scene/static serialization compatibility, and unsafe input cases.
 
-**Gate:** Layers coexist predictably, remain independently configurable, and create safe, deterministic scene output.
+**Gate passed.** Tests verified the configuration, layer order, clipping, atomic validation, and live/static parity. Firefox verified both orientations at a narrow viewport and custom indicator motion. [Phase 7 evidence](PROJECT_STATE.md#phase-7-handoff)
 
 ## 13. Phase 8 — Public events, hit testing, and extension lifecycle
 

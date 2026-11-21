@@ -1,3 +1,6 @@
+import { clipSlot } from '../scene/key-decorations.js';
+import type { DecorationLayer } from '../scene/key-decorations.js';
+import type { SvgNode } from './node.js';
 import { definitionReference } from './identifiers.js';
 import type { KeyboardScene, KeyPresentation, SceneKey } from '../scene/build-scene.js';
 
@@ -55,6 +58,29 @@ export function keyStyleAttributes(key: SceneKey, prefix: string) {
   };
 }
 
-export function indicatorAttributes(key: SceneKey) {
-  return { ...key.indicator, display: key.indicatorDisplay, 'pointer-events': 'none' };
+export function describeIndicator(key: SceneKey): SvgNode {
+  const { cx, cy, r, shape, ...paint } = key.indicator;
+  const common = {
+    ...paint, display: key.indicatorDisplay, 'pointer-events': 'none',
+    'aria-hidden': 'true', 'data-pressed-indicator': '',
+  };
+  return shape === 'circle'
+    ? { name: 'circle', attributes: { cx, cy, r, ...common } }
+    : { name: 'rect', attributes: { x: cx - r, y: cy - r, width: r * 2, height: r * 2, ...common } };
+}
+
+export function describeDecorationLayer(
+  scene: KeyboardScene, layer: DecorationLayer, prefix: string,
+): (SvgNode & { readonly children: readonly SvgNode[] }) | undefined {
+  const keys = scene.keys.filter(key => key.decorations[layer].length).sort((a, b) => a.note - b.note);
+  if (!keys.length) return;
+  return {
+    name: 'g',
+    attributes: { 'data-layer': layer, 'pointer-events': 'none', 'aria-hidden': 'true' },
+    children: keys.map(key => ({
+      name: 'g',
+      attributes: { 'data-decoration-note': key.note, 'clip-path': definitionReference(prefix, clipSlot(key.note)) },
+      children: key.decorations[layer],
+    })),
+  };
 }

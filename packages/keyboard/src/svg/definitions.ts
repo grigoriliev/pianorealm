@@ -1,20 +1,21 @@
 import type { SceneDefinition } from '../scene/build-scene.js';
 import { definitionId } from './identifiers.js';
 
-type Attributes = Readonly<Record<string, string | number>>;
+import type { SvgNode } from './node.js';
 
-interface SvgDefinitionNode {
-  readonly name: 'defs' | 'linearGradient' | 'stop' | 'filter' | 'feDropShadow';
-  readonly attributes: Attributes;
-  readonly children?: readonly SvgDefinitionNode[];
-}
-
-export function describeDefinitions(definitions: readonly SceneDefinition[], prefix: string): SvgDefinitionNode {
+export function describeDefinitions(definitions: readonly SceneDefinition[], prefix: string): SvgNode {
   return {
     name: 'defs',
     attributes: {},
     children: definitions.map(definition => {
       const id = definitionId(prefix, definition.slot);
+      if (definition.kind === 'clip') {
+        return {
+          name: 'clipPath',
+          attributes: { id, clipPathUnits: 'userSpaceOnUse' },
+          children: definition.bounds.map(bounds => ({ name: 'rect', attributes: { ...bounds } })),
+        };
+      }
       if (definition.kind === 'gradient') {
         return {
           name: 'linearGradient',

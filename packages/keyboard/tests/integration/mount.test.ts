@@ -819,7 +819,7 @@ describe('static parity', () => {
     const layout = calculateLayout(config.range, config.orientation, config.sizing);
     const scene = buildScene(config, layout, minimalAppearance);
     const label = '"><script href="evil"> & 🎹\t\r\n';
-    // Exercise the encoding boundary directly. Current public options have no user-text field.
+    // Exercise the root attribute encoding boundary directly.
     const markup = serializeScene({ ...scene, label });
     const root = new dom.window.DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
     expect(root.getAttribute('aria-label')).toBe(label);
@@ -827,5 +827,202 @@ describe('static parity', () => {
     for (const invalid of ['\u0000', '\uD800', '\uDC00', '\uFFFF']) {
       expect(() => serializeScene({ ...scene, label: invalid })).toThrow(TypeError);
     }
+  });
+});
+
+describe('visual annotations', () => {
+  const range = { from: 60, to: 63 };
+  const fixed = { mode: 'fixed' } as const;
+  const layer = (name: string) => svg().querySelector(`[data-layer="${name}"]`);
+  const markers = () => svg().querySelectorAll('[data-pressed-indicator]');
+  const shownMarkers = () => svg().querySelectorAll('[data-pressed-indicator][display="inline"]');
+
+  it('switches modes while retaining all pressed notes and the unrelated layers', () => {
+    const piano = mount({ range, sizing: fixed, highlights: { 60: '#fa0' }, labels: { mode: 'note' } });
+    const root = svg();
+    const white = root.querySelector('[data-note="60"]');
+    const black = root.querySelector('[data-note="61"]');
+    const highlight = layer('highlights')?.firstElementChild;
+    const label = layer('labels')?.firstElementChild;
+    piano.setPressedKeys([60, 61, 64]);
+    expect(visiblePressed(root)).toEqual([60, 61]);
+    expect(shownMarkers()).toHaveLength(2);
+
+    piano.setOptions({ pressedMode: 'color' });
+    expect(shownMarkers()).toHaveLength(0);
+    expect(visiblePressed(root)).toEqual([60, 61]);
+    piano.setOptions({ pressedMode: 'indicator', indicator: { shape: 'square', opacity: 0.6 } });
+    expect(visiblePressed(root)).toEqual([]);
+    expect(Array.from(shownMarkers(), node => [node.localName, node.getAttribute('fill'), node.getAttribute('opacity')]))
+      .toEqual([['rect', '#171717', '0.6'], ['rect', '#ffffff', '0.6']]);
+    expect(white?.getAttribute('fill')).toBe(minimalAppearance.white);
+    expect(black?.getAttribute('fill')).toBe(minimalAppearance.black);
+    expect(layer('highlights')?.firstElementChild).toBe(highlight);
+    expect(layer('labels')?.firstElementChild).toBe(label);
+
+    const marker = markers()[0];
+    piano.releaseKey(60);
+    expect(marker.getAttribute('display')).toBe('none');
+    piano.pressKey(60);
+    expect(marker.getAttribute('display')).toBe('inline');
+    piano.setSkin('classic');
+    piano.setOrientation('vertical');
+    piano.resize();
+    expect(svg()).toBe(root);
+    expect(root.querySelector('[data-note="60"]')).toBe(white);
+    expect(root.querySelector('[data-note="61"]')).toBe(black);
+    expect(markers()[0]).toBe(marker);
+    expect(white?.getAttribute('fill')).toMatch(/url\(#.*-white-gradient\)/);
+    piano.setRange(62, 64);
+    expect(piano.getPressedKeys()).toEqual([60, 61, 64]);
+    expect(shownMarkers()).toHaveLength(1);
+    piano.setRange(60, 64);
+    expect(shownMarkers()).toHaveLength(3);
+    piano.clearPressedKeys();
+    expect(shownMarkers()).toHaveLength(0);
+    piano.setOptions({ pressedMode: undefined, indicator: undefined });
+    piano.pressKey(61);
+    expect(shownMarkers()[0].localName).toBe('circle');
+    expect(visiblePressed(svg(), '#85502b')).toEqual([61]);
+  });
+
+  it('replaces maps and preserves unaffected note groups, key nodes and canonical off-range assignments', () => {
+    const piano = mount({
+      range, sizing: fixed, notation: { octaveOffset: 1 },
+      overlays: { Db5: [{ type: 'number', value: 7 }], C5: [{ type: 'circle' }], E5: [{ type: 'badge', text: 'IV' }] },
+      labels: { custom: { E5: 'Mi' } },
+      highlights: { E5: '#fa0' },
+    });
+    const root = svg();
+    const keys = Array.from(root.querySelectorAll('[data-note]'));
+    const overlayFor = (note: number) => layer('overlays')?.querySelector(`[data-decoration-note="${note}"]`);
+    const untouched = overlayFor(61);
+    expect(overlayFor(64)).toBeNull();
+    piano.setOptions({ notation: undefined });
+    piano.setSkin('classic');
+    piano.setRange(60, 64);
+    expect(overlayFor(64)?.textContent).toBe('IV');
+    expect(layer('labels')?.textContent).toBe('Mi');
+    expect(layer('highlights')?.querySelector('[fill="#fa0"]')).toBeTruthy();
+    piano.setRange(60, 63);
+
+    const current = svg();
+    const bodies = Array.from(current.querySelectorAll('[data-note]'));
+    const oldGroup = overlayFor(61);
+    const overlays = [
+      { type: 'circle', color: '#098' },
+      { type: 'text', text: 'Do' },
+      { type: 'number', value: 1 },
+      { type: 'badge', text: 2, background: '#abc' },
+    ] as const;
+    const input = { 61: [{ type: 'number', value: 7 }] as const, C4: [...overlays] };
+    piano.setKeyOverlays(input);
+    expect(oldGroup).not.toBe(untouched);
+    expect(overlayFor(61)).toBe(oldGroup);
+    expect(Array.from(overlayFor(60)!.children, node => [node.localName, node.textContent]))
+      .toEqual([['circle', ''], ['text', 'Do'], ['text', '1'], ['g', '2']]);
+    expect(Array.from(layer('overlays')!.children, node => node.getAttribute('data-decoration-note'))).toEqual(['60', '61']);
+    input.C4.length = 0;
+    piano.setOrientation('vertical');
+    expect(overlayFor(60)?.textContent).toBe('Do12');
+    expect(Array.from(current.querySelectorAll('[data-note]')).every((node, index) => node === bodies[index])).toBe(true);
+    expect(keys[0]).not.toBe(bodies[0]);
+
+    piano.setKeyOverlays({ 60: [] });
+    expect(layer('overlays')).toBeNull();
+    expect(svg().querySelectorAll('clipPath')).toHaveLength(0);
+    piano.setKeyOverlays({ 62: [{ type: 'circle' }] });
+    piano.setKeyOverlays({});
+    expect(layer('overlays')).toBeNull();
+    expect(() => piano.setKeyOverlays(undefined as never)).toThrow(TypeError);
+  });
+
+  it('reserves clip IDs against existing host IDs before decorations are enabled', () => {
+    const warmup = mount({ range, sizing: fixed, labels: { custom: { 60: 'Do' } } });
+    const clip = svg().querySelector('clipPath')!;
+    const collision = dom.window.document.createElement('span');
+    collision.id = clip.id.replace(/-1-key-clip-60$/, '-2-key-clip-60');
+    warmup.destroy();
+    container.appendChild(collision);
+    const piano = mount({ range, sizing: fixed });
+    piano.setKeyOverlays({ 60: [{ type: 'circle' }] });
+    const active = svg().querySelector('clipPath')!;
+    expect(active.id).not.toBe(collision.id);
+    expect(layer('overlays')?.querySelector('g[clip-path]')?.getAttribute('clip-path')).toBe(`url(#${active.id})`);
+    expect(dom.window.document.getElementById(collision.id)).toBe(collision);
+  });
+
+  it('keeps clip definitions isolated across mounts and rejects mixed invalid updates without DOM writes', () => {
+    const options = { range, sizing: fixed, overlays: { 60: [{ type: 'circle' }] } } as const;
+    const piano = mount(options);
+    const other = dom.window.document.getElementById('other')!;
+    mount(options, other);
+    const firstClip = svg().querySelector('clipPath')!.id;
+    const otherClip = svg(other).querySelector('clipPath')!.id;
+    expect(firstClip).not.toBe(otherClip);
+    expect(layer('overlays')?.firstElementChild?.getAttribute('clip-path')).toBe(`url(#${firstClip})`);
+    const otherMarkup = other.innerHTML;
+    piano.setPressedKeys([60, 63]);
+    const before = container.innerHTML;
+    const observer = new dom.window.MutationObserver(() => {});
+    observer.observe(container, { childList: true, subtree: true, attributes: true });
+    expect(() => piano.setOptions({
+      range: { from: 62, to: 63 }, notation: { octaveOffset: 1 }, skin: 'classic',
+      labels: { custom: { C5: 'ok' } },
+      overlays: { C5: [{ type: 'circle' }], D5: [{ type: 'text', text: '\uFFFF' }] },
+    })).toThrow(TypeError);
+    expect(() => piano.setKeyOverlays({ 'B#3': [], 60: [] })).toThrow(RangeError);
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+    expect(container.innerHTML).toBe(before);
+    expect(piano.getPressedKeys()).toEqual([60, 63]);
+    piano.destroy();
+    expect(container.querySelector('svg, style')).toBeNull();
+    expect(other.innerHTML).toBe(otherMarkup);
+    expect(() => piano.setKeyOverlays({})).toThrow(/destroyed/);
+    mount({ range, sizing: fixed });
+    expect(layer('overlays')).toBeNull();
+  });
+
+  it.each(['horizontal', 'vertical'] as const)('matches parsed static layers, text and clips in %s orientation', orientation => {
+    const text = '<&"🎹\r';
+    const options = {
+      range: { from: 61, to: 63 }, orientation, sizing: { ...fixed, whiteKeyWidth: 34 },
+      skin: 'classic', pressedMode: 'indicator', indicator: { shape: 'square', opacity: 0.8, stroke: '#fff' },
+      labels: { mode: 'note', custom: { 62: text } },
+      highlights: { 62: '#fa0' },
+      overlays: { 62: [{ type: 'circle', depth: 0, pitch: 1 }, { type: 'badge', text: 4 }], 63: [{ type: 'number', value: 2 }] },
+    } as const;
+    const piano = mount({ ...options, orientation: 'horizontal', overlays: undefined });
+    piano.setPressedKeys([61, 62, 127]);
+    piano.setKeyOverlays(options.overlays);
+    piano.setOrientation(orientation);
+    const config = normalizeConfig(options);
+    const layout = calculateLayout(config.range, config.orientation, config.sizing);
+    const scene = buildScene(config, layout, config.appearance, new Set(piano.getPressedKeys()));
+    const parsed = new dom.window.DOMParser().parseFromString(serializeScene(scene, scene, 'printed'), 'image/svg+xml').documentElement;
+    const prefix = svg().getAttribute('data-pianorealm-motion')!;
+    const describe = (element: Element, idPrefix: string): unknown => ({
+      name: element.localName,
+      attributes: Object.fromEntries(drawingAttributes(element)
+        .map(([name, value]) => [name, value.replaceAll(`${idPrefix}-`, 'keyboard-')])),
+      children: element.children.length
+        ? Array.from(element.children, child => describe(child, idPrefix))
+        : element.textContent,
+    });
+    expect(describe(parsed, 'printed')).toEqual(describe(svg(), prefix));
+    expect(parsed.querySelector('[data-layer="labels"] [data-decoration-note="62"]')?.textContent).toBe(text);
+    const layers = Array.from(parsed.children, node => node.getAttribute('data-layer')
+      ?? (node.hasAttribute('data-pressed-indicator') ? 'indicator' : node.localName));
+    expect(layers).toEqual(['defs', 'rect', 'rect', 'rect', 'rect', 'highlights', 'labels',
+      'indicator', 'indicator', 'indicator', 'overlays']);
+    expect(parsed.getAttribute('role')).toBe('img');
+    expect(parsed.getAttribute('aria-label')).toMatch(/piano keyboard, C#4 to D#4/);
+    expect(parsed.querySelector('[data-layer]:not([aria-hidden="true"]), [data-pressed-indicator]:not([aria-hidden="true"])'))
+      .toBeNull();
+    expect(parsed.querySelector('script, style, [onload], [href], [tabindex]')).toBeNull();
+    const css = container.querySelector('style')?.textContent;
+    expect(css).toContain('@media (prefers-reduced-motion: no-preference)');
+    expect(css).toContain('> [data-pressed-indicator]');
   });
 });

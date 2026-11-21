@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 6 · **Phase 6:** Complete
+> **Status:** Implementation · **Last completed phase:** Phase 7 · **Phase 7:** Complete
 > **Last verified:** 2026-11-22 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
@@ -12,9 +12,49 @@
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
 
+## Phase 7 handoff
+
+The [Phase 7 gate](prompts/01-implementation/phase-07-labels-indicators-overlays.md#7-phase-7-completion-gate) was reverified on 2026-11-22 at HEAD `6ce8d9a` with the Phase 7 working-tree changes. Phase 6 is tracked in `8418d1f`. Resume with the full working tree, including the untracked Phase 7 source and test files listed below. The pre-existing untracked package `.gitignore` is unrelated. Phase 8 is pending.
+
+- **Configuration and API.** New `src/config/decorations.ts` defines label, indicator, and overlay options. `normalize.ts`, `PianoKeyboard.ts`, and `index.ts` wire the settings into construction, `setOptions`, and `setKeyOverlays`. Per-note maps replace atomically, reject duplicate normalized MIDI notes, and retain valid off-range entries. The default remains pressed fill plus a white circle, with labels, highlights and overlays opt-in. [API and defaults](README.md#labels-highlights-and-overlays)
+- **Scene and SVG.** New `src/scene/key-decorations.ts` resolves positions and the visible geometric face of each decorated key. `build-scene.ts`, `svg/attributes.ts`, `definitions.ts`, and new `svg/node.ts` supply shared descriptions to `dom-renderer.ts` and `serialize.ts`. The drawing orders white and black key bodies, highlight strips, upright labels, indicators, then overlays. The white clip subtracts black footprints. The DOM adapter preserves key bodies and equivalent per-note decoration groups during presentation changes. `mount.ts`, `motion.ts`, and `identifiers.ts` handle targeted pressed updates, fades and isolated clip IDs. [Layer order](ARCHITECTURE.md#73-stacking-and-overlays)
+- **Validation and accessibility.** `skins/appearance.ts` exposes its existing paint and numeric validators internally and new `src/internal/xml-text.ts` shares XML character checks. Literal text is emitted as DOM text nodes or escaped SVG. The SVG remains a single named image and hides decorative subtrees from assistive technology. The README documents the geometry-based text floor, opt-in color-only mode and host text for meaningful annotations.
+- **Tests and docs.** New `tests/unit/decorations.test.ts` and updated `tests/unit/config.test.ts` and `tests/integration/mount.test.ts` check notation, clips, tiny sizes, pressed modes, replacement, identity, atomic failures, ID isolation, XML text and parsed SVG parity. `README.md`, `ARCHITECTURE.md` and `DEVELOPMENT_PLAN.md` record the contract and phase completion. The existing demo passed regression checks.
+- **Demo follow-up.** `demo/index.html`, `main.ts`, and `demo.css` add controls for label mode, C emphasis, pressed mode, indicator shape, and example annotations. The example uses the public API on all three mounts and shows a custom label, an independent highlight and all four overlay primitives. The README documents how to try them. [Development demo](README.md#development-demo)
+
+### Completion criteria
+
+| Criterion | Verified evidence |
+| --- | --- |
+| Labels and independent highlights | Unit tests check all label modes, C4/MIDI 60, notation, custom label precedence, C emphasis and explicit highlights. Off-range assignments reappear at their original MIDI identity. |
+| Pressed modes and overlay replacement | Integration tests switch all three pressed modes on white and black keys while retaining the selection. They verify the four overlay primitives, per-note array order, whole-map replacement and clearing. |
+| Layering, geometry and targeted updates | Unit tests cover fractional and tiny keys and black endpoints in both orientations. Integration tests verify that range-preserving updates reuse key bodies and equivalent decoration groups. Firefox checks pixels on either side of a white-key clip, marker contrast and upright label bounds. |
+| Atomic validation and serialization | Unit tests reject invalid notes, dimensions, paints, event attributes and XML characters. Integration tests observe no DOM writes on rejected patches and compare parsed live and static output, including literal text and clip references. Pure generation runs without browser globals. |
+| Accessibility, motion and lifecycle | Integration tests verify image naming, hidden decorative subtrees, cross-mount ID isolation, host ID collision avoidance and teardown. Firefox checks custom indicator opacity and live reduced-motion changes. |
+| Package and documentation | The package checks below passed. The README and architecture describe the implemented options, replacement semantics, limits and layer order. The development plan records Phase 7 as complete. |
+
+### Verification
+
+Package commands ran from `packages/keyboard` with IntelliJ IDEA's Node 24.22.1 and npm 11.19.1 on `PATH`. The two standalone Firefox commands and Git checks ran from the repository root.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build` before edits | Passed with 203 tests in 7 files. |
+| `npm run typecheck && npm test && npm run build` rerun for this handoff | Exit 0. Typecheck emitted no diagnostics. Vitest 4.1.12 passed 249 tests across 8 files, including the existing geometry fixtures. Vite 7.3.8 built the ESM bundle and source map. TypeScript 5.9.3 emitted declarations. |
+| `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022 --module NodeNext /tmp/pianorealm-phase7/consumer/node.mts` and `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022,DOM --module NodeNext /tmp/pianorealm-phase7/consumer/browser.mts` | Both reruns passed against the built package declarations. |
+| `node --input-type=module` with inline assertions during Phase 7 implementation | Passed. Verified the four named runtime exports, default C4 normalization, `setKeyOverlays`, and the private serializer boundary. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 /tmp/pianorealm-phase7/firefox-smoke.py packages/keyboard/dist/pianorealm-keyboard.esm.js` | Rerun passed in headless Firefox 160.0.1. Checked rendered overlay clipping and marker contrast pixels in both orientations, upright label bounds, fractional narrow-host fitting, custom square opacity, live reduced motion, clip isolation and teardown. The standalone raster check used the mounted SVG snapshot. Pure serializer parity was checked in the automated tests. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 /tmp/pianorealm-phase6/firefox-smoke.py packages/keyboard/dist/pianorealm-keyboard.esm.js` | Passed during Phase 7 implementation in Firefox 160.0.1 for Phase 6 responsive sizing, default motion, isolation and teardown. |
+| `python3 /tmp/pianorealm-phase6/demo/demo-smoke.py` | Passed during Phase 7 implementation in Firefox 160.0.1. Vite served the existing demo. The fixture checked all three mounts, controls, Classic rasterization, SVG downloads and narrow-host scrolling. |
+| `npm run typecheck && npm test && npm run build` after the demo update | Exit 0. All 249 tests passed across eight files. Typecheck and the ESM and declaration build passed. |
+| `python3 /tmp/pianorealm-phase7/demo/demo-smoke.py` | Passed in Firefox 160.0.1. Checked the annotation controls, retention through chord release and skin changes, and byte-identical annotated SVG downloads from all three mounts. The existing Classic raster and narrow-scroll checks also passed. |
+| `git diff --check` and `git status --short --untracked-files=all` | Whitespace check passed. Changes are confined to the keyboard package. The pre-existing untracked package `.gitignore` was preserved. |
+
+Browser and consumer fixtures are temporary files outside the repository. Browser checks used local loopback access. Text uses an intrinsic-size estimate and can still become small under container scaling. Assistive technologies, other browser engines, physical mobile devices and Anki clients remain untested for Phase 7. The initial overlay set covers circle, text, number and badge. Typed path commands remain outside this phase's initial primitives.
+
 ## Phase 6 handoff
 
-The [Phase 6 completion gate](prompts/01-implementation/phase-06-responsive-sizing-animation.md#9-completion-gate) passed on HEAD `e0bb20a` with the local Phase 6 working-tree changes. Keep the working tree when resuming, including the new `src/config/animation.ts` and `src/svg/motion.ts` files. The pre-existing untracked package `.gitignore` is separate from Phase 6. Phase 7 is pending.
+The [Phase 6 completion gate](prompts/01-implementation/phase-06-responsive-sizing-animation.md#9-completion-gate) passed on HEAD `e0bb20a` with the local Phase 6 working-tree changes. Keep the working tree when resuming, including the new `src/config/animation.ts` and `src/svg/motion.ts` files. The pre-existing untracked package `.gitignore` is separate from Phase 6. This section records the Phase 6 checkpoint.
 
 - `src/svg/mount.ts` batches ResizeObserver work to a single measurement per frame, drops floating-point noise, and cancels pending work during explicit resize, mode switches, and teardown. A hidden or zero-size host can recover with the same drawing. Without observation the constructor and explicit `resize()` measure the host. Fixed sizing uses explicit axes or the oriented intrinsic extent. Both modes retain the accepted centered contain and clipping rules. [A-04](docs/decisions/0002-layout-sizing-and-hit-testing.md) · [A-12](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
 - `src/public/PianoKeyboard.ts` and `src/svg/dom-renderer.ts` reuse key nodes for viewport, orientation and key-dimension updates with the same range. A range change replaces the ordered key layers and their MIDI lookup. Pressed notes, including off-range notes, skin and overrides survive resizing and orientation changes. Geometry and the private serializer retain their existing coordinate and final-state attribute contracts.
@@ -226,8 +266,8 @@ From the repository root, `git diff --check` passed and `git status --short --un
 - Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
 - Firefox 160.0.1 was the only real browser checked for Phases 5 and 6. The Phase 6 smoke adds browser evidence for mode switching. Observer setup rollback is covered by DOM integration tests. Other browsers, assistive technologies and Anki clients remain unverified.
 - Classic gradient-to-solid changes apply immediately. Hosts without ResizeObserver need explicit `resize()` after layout changes. Hosts without the reduced-motion CSS feature show the stable final state.
-- Configurable labels, pressed indicators and layered overlays remain Phase 7 work. Public events, mounted hit testing and extension lifecycle remain Phase 8 work. The public static SVG API, inline static skins, classic-script output and Anki verification remain Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS and optional public key bounds remain deferred.
+- Public events, mounted hit testing and extension lifecycle remain Phase 8 work. The public static SVG API, inline static skins, classic-script output and Anki verification remain Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS and optional public key bounds remain deferred.
 
 ## Next task
 
-Begin Phase 7 — Labels, Indicators, and Layered Overlays. First review the A-07 layer order and per-key clipping rules against the current scene's fixed pressed dot. Define the initial shared-scene changes for label and indicator placement, with horizontal and vertical black-endpoint fixtures for live/static parity. [Scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md) · [Phase 7 plan](DEVELOPMENT_PLAN.md#12-phase-7--labels-indicators-and-layered-overlays)
+Review the [Phase 8 plan](DEVELOPMENT_PLAN.md#13-phase-8--public-events-hit-testing-and-extension-lifecycle) against A-09 and A-10. Define the typed subscription payloads, post-commit ordering and no-op behavior for the current mounted transactions before implementing events. Verify the public hit-test mapping under scaling and both orientations when that surface is added. [Geometry ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md) · [Lifecycle ADR](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)

@@ -14,8 +14,8 @@ export function updateMotion(style: HTMLStyleElement, prefix: string, animation:
   const css = animation.enabled && animation.duration > 0 ? `
 @media (prefers-reduced-motion: no-preference) {
   ${root} > rect[data-note] { transition: fill ${timing}; }
-  ${root} > circle { display: inline; opacity: 1; transition: opacity ${timing}; }
-  ${root} > circle[display="none"] { opacity: 0; }
+  ${root} > [data-pressed-indicator] { display: inline; transition: opacity ${timing}; }
+  ${root} > [data-pressed-indicator][display="none"] { opacity: 0; }
 }` : '';
   if (style.textContent !== css) style.textContent = css;
 }

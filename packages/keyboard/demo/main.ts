@@ -1,5 +1,14 @@
 import { PianoKeyboard } from '../src/index.js';
-import type { KeyboardOptions } from '../src/index.js';
+import type { IndicatorOptions, KeyboardOptions, KeyOverlays, LabelMode, PressedMode } from '../src/index.js';
+
+const exampleOverlays = {
+  C4: [
+    { type: 'circle', color: '#167286', size: 7, depth: 0.25 },
+    { type: 'badge', text: 1, depth: 0.48 },
+  ],
+  E4: [{ type: 'text', text: 'Mi' }],
+  G4: [{ type: 'number', value: 5 }],
+} satisfies KeyOverlays;
 
 const samples = {
   horizontal: { range: { from: 'C3', to: 'C5' }, orientation: 'horizontal' },
@@ -67,5 +76,38 @@ const animate = document.querySelector<HTMLInputElement>('#animate-highlights');
 animate?.addEventListener('change', () => {
   for (const piano of keyboards) {
     piano.setOptions({ animation: { enabled: animate.checked } });
+  }
+});
+
+const labelMode = document.querySelector<HTMLSelectElement>('#label-mode');
+labelMode?.addEventListener('change', () => {
+  for (const piano of keyboards) piano.setOptions({ labels: { mode: labelMode.value as LabelMode } });
+});
+
+const emphasizeC = document.querySelector<HTMLInputElement>('#emphasize-c');
+emphasizeC?.addEventListener('change', () => {
+  for (const piano of keyboards) piano.setOptions({ labels: { emphasizeC: emphasizeC.checked } });
+});
+
+const pressedMode = document.querySelector<HTMLSelectElement>('#pressed-mode');
+pressedMode?.addEventListener('change', () => {
+  for (const piano of keyboards) piano.setOptions({ pressedMode: pressedMode.value as PressedMode });
+});
+
+const indicatorShape = document.querySelector<HTMLSelectElement>('#indicator-shape');
+indicatorShape?.addEventListener('change', () => {
+  const shape = indicatorShape.value as IndicatorOptions['shape'];
+  for (const piano of keyboards) piano.setOptions({ indicator: { shape } });
+});
+
+const showAnnotations = document.querySelector<HTMLInputElement>('#show-annotations');
+showAnnotations?.addEventListener('change', () => {
+  const enabled = showAnnotations.checked;
+  for (const piano of keyboards) {
+    piano.setOptions({
+      labels: { custom: enabled ? { C4: 'Do' } : undefined },
+      highlights: enabled ? { E4: '#e69534' } : undefined,
+    });
+    piano.setKeyOverlays(enabled ? exampleOverlays : {});
   }
 });

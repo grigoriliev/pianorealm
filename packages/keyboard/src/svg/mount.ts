@@ -40,6 +40,7 @@ export class MountedSvg {
   readonly #ids: ReturnType<typeof reserveLivePrefix>;
   readonly #motionStyle: HTMLStyleElement;
   #appearance: KeyboardScene['appearance'];
+  #pressedMode: KeyboardScene['pressedMode'];
   #drawing: ReturnType<typeof buildSvg>;
   #intrinsicSize: Viewport;
   #viewport: Viewport | null = null;
@@ -54,6 +55,7 @@ export class MountedSvg {
     this.#sizing = sizing;
     this.#intrinsicSize = { width: scene.width, height: scene.height };
     this.#appearance = scene.appearance;
+    this.#pressedMode = scene.pressedMode;
     this.#slot = this.#createSlot(sizing);
     this.#motionStyle = container.ownerDocument.createElement('style');
     this.#ids = reserveLivePrefix(container);
@@ -194,7 +196,10 @@ export class MountedSvg {
     this.#drawing = drawing;
     this.#sizing = sizing;
     this.#intrinsicSize = intrinsicSize;
-    if (scene) this.#appearance = scene.appearance;
+    if (scene) {
+      this.#appearance = scene.appearance;
+      this.#pressedMode = scene.pressedMode;
+    }
     this.#applyViewport(viewport);
   }
 
@@ -205,11 +210,12 @@ export class MountedSvg {
   restyle(scene: KeyboardScene): void {
     updateSvg(this.#drawing, scene, this.#ids.prefix);
     this.#appearance = scene.appearance;
+    this.#pressedMode = scene.pressedMode;
   }
 
   setKeyPressed(note: number, pressed: boolean): void {
     const nodes = this.#drawing.keys.get(note);
-    if (nodes) updateKeyPresentation(nodes, keyPresentation(nodes.kind, this.#appearance, pressed), this.#ids.prefix);
+    if (nodes) updateKeyPresentation(nodes, keyPresentation(nodes.kind, this.#appearance, pressed, this.#pressedMode), this.#ids.prefix);
   }
 
   resize(): void {

@@ -17,6 +17,14 @@ h1 {
   letter-spacing: -0.025em;
 }
 
+.annotation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-block: 1rem;
+}
+
 .samples {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,5 +1,7 @@
-import { findSkin, minimalAppearance, normalizeAppearance, resolveAppearance } from '../skins/appearance.js';
-import type { AppearanceOptions, ResolvedAppearance } from '../skins/appearance.js';
+import { defaultDecorations, normalizeIndicator, normalizeLabels, normalizeOverlays, noteMap } from './decorations.js';
+import type { DecorationConfig, IndicatorOptions, KeyOverlays, LabelOptions, NoteMap, PressedMode } from './decorations.js';
+import { findSkin, minimalAppearance, normalizeAppearance, resolveAppearance, validateColor } from '../skins/appearance.js';
+import type { AppearanceColor, AppearanceOptions, ResolvedAppearance } from '../skins/appearance.js';
 import { validateRecord } from '../internal/validate-record.js';
 import { defaultNotation, validateNotation } from '../notes/notation.js';
 import type { NotationOptions } from '../notes/notation.js';
@@ -42,9 +44,14 @@ export interface ConfigOptions {
   readonly skin?: string | undefined;
   readonly appearance?: AppearanceOptions | undefined;
   readonly animation?: AnimationOptions | undefined;
+  readonly labels?: LabelOptions | undefined;
+  readonly highlights?: NoteMap<AppearanceColor> | undefined;
+  readonly pressedMode?: PressedMode | undefined;
+  readonly indicator?: IndicatorOptions | undefined;
+  readonly overlays?: KeyOverlays | undefined;
 }
 
-interface ConfigSnapshot {
+interface ConfigSnapshot extends DecorationConfig {
   readonly range: MidiRange;
   readonly orientation: Orientation;
   readonly notation: ReturnType<typeof validateNotation>;
@@ -65,7 +72,7 @@ const DEFAULT_SIZING = Object.freeze({
   blackKeyHeight: 60,
 } satisfies ResolvedSizing);
 
-export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance', 'animation'] as const;
+export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance', 'animation', 'labels', 'highlights', 'pressedMode', 'indicator', 'overlays'] as const;
 
 const SIZING_FIELDS = [...Object.keys(DEFAULT_SIZING), 'width', 'height'];
 
@@ -116,6 +123,7 @@ function resolveSizing(options: SizingOptions): ResolvedSizing {
 const EMPTY_OVERRIDES = Object.freeze({});
 
 const DEFAULT_CONFIG: ConfigSnapshot = Object.freeze({
+  ...defaultDecorations,
   range: DEFAULT_RANGE,
   orientation: 'horizontal',
   notation: defaultNotation,
@@ -188,5 +196,20 @@ export function normalizeConfig(
   const animation = skin === previous.skin && animationOverrides === previous.animationOverrides
     ? previous.animation : resolveAnimation(skin, animationOverrides);
 
-  return Object.freeze({ orientation, notation, range, sizing, skin, overrides, appearance, animationOverrides, animation });
+  const pressedMode = Object.hasOwn(patch, 'pressedMode') ? (patch.pressedMode === undefined ? 'both' : patch.pressedMode) : previous.pressedMode;
+  if (pressedMode !== 'color' && pressedMode !== 'indicator' && pressedMode !== 'both') {
+    throw new TypeError('Pressed mode must be "color", "indicator" or "both"');
+  }
+  const labels = Object.hasOwn(patch, 'labels')
+    ? normalizeLabels(patch.labels, previous.labels, notation) : previous.labels;
+  const indicator = Object.hasOwn(patch, 'indicator')
+    ? normalizeIndicator(patch.indicator, previous.indicator) : previous.indicator;
+  const highlights = Object.hasOwn(patch, 'highlights')
+    ? noteMap(patch.highlights, notation, 'Highlights', validateColor) : previous.highlights;
+  const overlays = Object.hasOwn(patch, 'overlays')
+    ? noteMap(patch.overlays, notation, 'Overlays', normalizeOverlays) : previous.overlays;
+  return Object.freeze({
+    orientation, notation, range, sizing, skin, overrides, appearance, animationOverrides, animation,
+    pressedMode, labels, indicator, highlights, overlays,
+  });
 }

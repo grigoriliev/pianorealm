@@ -25,6 +25,31 @@
         <label><input id="hide-borders" type="checkbox"> Hide key borders</label>
         <label><input id="animate-highlights" type="checkbox" checked> Animate highlights</label>
       </p>
+      <div class="annotation-controls">
+        <label>Key labels
+          <select id="label-mode">
+            <option value="none">None</option>
+            <option value="note">Note names</option>
+            <option value="midi">MIDI numbers</option>
+            <option value="octave">Octaves</option>
+          </select>
+        </label>
+        <label><input id="emphasize-c" type="checkbox"> Emphasize C notes</label>
+        <label>Pressed keys
+          <select id="pressed-mode">
+            <option value="both">Color and indicator</option>
+            <option value="color">Color only</option>
+            <option value="indicator">Indicator only</option>
+          </select>
+        </label>
+        <label>Indicator shape
+          <select id="indicator-shape">
+            <option value="circle">Circle</option>
+            <option value="square">Square</option>
+          </select>
+        </label>
+        <label><input id="show-annotations" type="checkbox"> Show example annotations</label>
+      </div>
       <div class="samples">
         <section id="horizontal" class="sample" aria-labelledby="horizontal-title">
           <header>

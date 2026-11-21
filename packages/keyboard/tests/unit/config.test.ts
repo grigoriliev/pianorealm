@@ -6,6 +6,11 @@ import { minimalAppearance } from '../../src/skins/appearance.js';
 describe('configuration normalization', () => {
   it('resolves the approved core defaults', () => {
     expect(normalizeConfig()).toEqual({
+      labels: { mode: 'none', emphasizeC: false, custom: new Map() },
+      highlights: new Map(),
+      pressedMode: 'both',
+      indicator: {},
+      overlays: new Map(),
       range: { from: 21, to: 108 },
       orientation: 'horizontal',
       skin: 'minimal',
