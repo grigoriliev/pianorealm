@@ -76,8 +76,8 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **1** | Project foundation and note utilities | 0 | Tooling works; note/validation tests pass | Complete |
 | **2** | Pure geometry engine | 1 | Correct both-orientation layouts and edge cases | Complete |
 | **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Complete |
-| **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Not started |
-| **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Not started |
+| **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Complete |
+| **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Complete |
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Not started |
 | **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Not started |
 | **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Not started |
@@ -178,14 +178,14 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Define typed skin tokens and resolution order (defaults → selected skin → allowed overrides → documented contrast policy).
-- [ ] Implement **Minimal** and **Classic** skins first; validate switching while notes remain pressed.
-- [ ] Implement `setSkin`, appearance overrides, color/border/radius/shadow/gradient customization, and custom-skin API as finalized.
-- [ ] Scope styling to the SVG/component; create per-instance IDs for gradients, filters, or masks as needed.
-- [ ] Test skin switching, override precedence, malformed values, visual state continuity, and multi-instance isolation.
-- [ ] Record remaining promised skins (**Modern, Neon, Dark**, and any agreed high-contrast skin) as explicit Phase 10 completion items, not silently delivered.
+- [x] Define typed skin tokens and resolution order (defaults → selected skin → allowed overrides → explicit contrast policy when available).
+- [x] Implement **Minimal** and **Classic** skins first; validate switching while notes remain pressed.
+- [x] Implement `setSkin`, appearance overrides, color/border/radius/shadow/gradient customization, and custom-skin API as finalized.
+- [x] Scope styling to the SVG/component; create per-instance IDs for gradients, filters, or masks as needed.
+- [x] Test skin switching, override precedence, malformed values, visual state continuity, and multi-instance isolation.
+- [x] Record remaining promised skins (**Modern, Neon, Dark**, and any agreed high-contrast skin) as explicit Phase 10 completion items, not silently delivered.
 
-**Gate:** Minimal/Classic and customization are reliable; no skin-specific geometry or pressed-state logic; remaining skins are tracked.
+**Gate verified:** Minimal and Classic share the layout and pressed-state logic. Tests cover overrides, validation, targeted updates, definition isolation and SVG parity. Future skins and contrast policy are tracked in Phase 10. [Phase 5 evidence](PROJECT_STATE.md#phase-5-handoff)
 
 ## 11. Phase 6 — Sizing, responsiveness, and animation
 

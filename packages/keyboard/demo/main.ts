@@ -43,3 +43,22 @@ document.getElementById('highlight-f-sharp-minor')?.addEventListener('click', ()
 document.getElementById('clear-highlights')?.addEventListener('click', () => {
   for (const piano of keyboards) piano.clearPressedKeys();
 });
+
+const skin = document.querySelector<HTMLSelectElement>('#skin');
+skin?.addEventListener('change', () => {
+  for (const piano of keyboards) piano.setSkin(skin.value);
+});
+
+const transparent = document.querySelector<HTMLInputElement>('#transparent-background');
+transparent?.addEventListener('change', () => {
+  for (const piano of keyboards) {
+    piano.setOptions({ appearance: { background: transparent.checked ? 'transparent' : undefined } });
+  }
+});
+
+const hideBorders = document.querySelector<HTMLInputElement>('#hide-borders');
+hideBorders?.addEventListener('change', () => {
+  for (const piano of keyboards) {
+    piano.setOptions({ appearance: { strokeWidth: hideBorders.checked ? 0 : undefined } });
+  }
+});

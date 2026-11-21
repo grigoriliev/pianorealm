@@ -29,7 +29,9 @@ npm run dev:demo
 
 Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
 
-Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. Each **Download SVG** button saves the SVG currently mounted in that card, including its highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the selection on all three keyboards. **Clear highlights** releases all notes. The **Skin** selector and appearance checkboxes apply to all three examples. Each **Download SVG** button saves the SVG currently mounted in that card, including its skin and highlights. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+
+To check skin switching and export, highlight F♯ minor, choose **Classic**, and confirm each example keeps three pressed dots. Download a Classic SVG and open it on its own to check the gradient, shadow and highlights. Choose **Minimal** to restore the flat fills while keeping the same notes pressed.
 
 ## Note utilities
 
@@ -60,7 +62,7 @@ Give the HTML host an available content-box width and height for the default con
 </script>
 ```
 
-The constructor accepts `container`, `range`, `orientation`, `notation` and `sizing` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
+The constructor accepts `container`, `range`, `orientation`, `notation`, `sizing`, `skin` and `appearance` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
 
 Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected, hidden, or zero-size host waits for a usable viewport. The adapter observes size changes where `ResizeObserver` is available. Use `resize()` after a host change if observation is unavailable or you need an immediate update. In fixed mode, `sizing.width` and `sizing.height` set the viewport in CSS pixels, with each omitted dimension taken from the oriented geometry. Fixed keyboards can be constructed while their host is detached.
 
@@ -78,14 +80,51 @@ piano.clearPressedKeys();
 
 These methods control the drawing only. Minimal shows pressed keys with a blue fill and a dot. `setPressedKeys` accepts an array (including a readonly array in TypeScript) of MIDI numbers and note names. Other collections, such as sets and generators, are unsupported. Names are interpreted using the keyboard's notation when passed in. Equivalent notes share one MIDI identity, and an invalid item leaves the entire selection and drawing unchanged.
 
-`getPressedKeys()` returns a new array in ascending MIDI order. It includes any valid MIDI note still pressed outside the displayed range. Changing the visible range, flipping orientation, or resizing preserves that selection. `pressKey` adds one note, `releaseKey` removes one note, and `clearPressedKeys` releases all notes. Repeating a command with the same result leaves the drawing untouched.
+`getPressedKeys()` returns a new array in ascending MIDI order. It includes any valid MIDI note still pressed outside the displayed range. Changing the visible range, flipping orientation, switching skins, or resizing preserves that selection. `pressKey` adds one note, `releaseKey` removes one note, and `clearPressedKeys` releases all notes. Repeating a command with the same result leaves the drawing untouched.
 
 ## Configuration
 
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
-Internally, configuration patches merge notation and sizing fields and replace a range as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value and an explicit `undefined` resets it. Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. Validated configuration is returned as a frozen snapshot, and a rejected patch leaves the previous snapshot unchanged.
+`setOptions(patch: KeyboardOptionsPatch)` merges individual fields in `notation`, `sizing` and `appearance`, and replaces a `range` as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
+
+Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. To return to default container sizing and remove fixed viewport dimensions, use `piano.setOptions({ sizing: undefined })`.
+
+## Skins and appearance
+
+Choose `skin: 'minimal'` (default) or `skin: 'classic'` at construction, or call `piano.setSkin(name)` after mounting. Minimal uses flat fills and blue pressed keys. Classic uses ivory and dark gradients, small corner radii, a subtle black-key shadow, and brown pressed keys. Both show a white dot on pressed keys. Skin and appearance changes preserve the SVG root, key nodes, geometry and pressed notes, including notes outside the range.
+
+```ts
+piano.setSkin('classic');
+piano.setOptions({ appearance: { background: 'transparent', white: '#fff8e9' } });
+piano.setOptions({ appearance: { white: undefined } }); // Restore the selected skin's white-key paint
+piano.setOptions({ appearance: undefined });           // Remove all instance overrides
+
+piano.registerSkin('studio', {
+  white: { stops: [{ offset: 0, color: '#dce3ee' }, { offset: 1, color: '#fff' }] },
+  pressed: '#205598',
+  cornerRadius: 1.5,
+});
+piano.setSkin('studio');
+```
+
+`registerSkin(name, appearance)` copies and validates the tokens for the lifetime of the instance. Names start with a lowercase ASCII letter. The remaining characters may be lowercase ASCII letters, digits or hyphens. Registration leaves the selected skin unchanged. Built-in names and names already registered on the same instance are reserved. Custom skins can be selected after registration. Each new instance starts with the built-ins.
+
+Resolution starts with Minimal defaults, applies the selected skin's tokens, and then applies explicit instance overrides. Skin selection keeps current overrides. Use `setOptions({ skin: undefined })` to return to Minimal. Custom colors may require contrast checks in the target host. An explicit high-contrast policy is planned for Phase 10.
+
+| `AppearanceOptions` field | Accepted value |
+| --- | --- |
+| `background` | Color. Use `'transparent'` to show the host background. |
+| `white`, `black` | Color or `{ stops: [{ offset, color }, ...] }`. A gradient takes 2–8 stops in nondecreasing order, with numeric offsets from 0 through 1. It runs from the rear to the front of each key. An override replaces the entire paint. |
+| `boundary` | Key border color. |
+| `strokeWidth`, `cornerRadius` | Finite nonnegative numbers in SVG user units. Zero disables the corresponding effect. SVG limits the rendered radius to the rectangle's bounds. |
+| `pressed` | Solid pressed-key color for both white and black keys. |
+| `blackKeyShadow` | Shadow opacity from 0 through 1. The renderer supplies the offset and blur. Zero disables the shadow. |
+
+Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unknown names and fields, unsupported paint syntax and malformed tokens throw `TypeError`. Out-of-range numeric tokens throw `RangeError`. The root exports `BuiltInSkin`, `AppearanceOptions`, `AppearanceColor`, `KeyPaint`, `KeyGradient` and `GradientStop`.
+
+Gradient and shadow definitions travel with the SVG and use instance-specific IDs. The public static SVG API and its inline custom-skin options are scheduled for Phase 9.
 
 ## Internal geometry
 
-The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serialization prototype use the same scene derived from this layout. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
+The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serializer use the same scene derived from this layout and the resolved appearance. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)

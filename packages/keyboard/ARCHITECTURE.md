@@ -262,7 +262,7 @@ The scene represents stable key identities, geometry, style, labels, indicators,
 - Escape all untrusted text and attribute values; reject unsupported SVG payloads rather than injecting raw markup unsafely.
 - Avoid global CSS, external fonts/images/stylesheets, and network requests.
 - Define a stable strategy for SVG `<defs>` identifiers so separately embedded instances do not collide.
-- Yield deterministic output for identical inputs **under the documented ID policy**; consider explicit `idPrefix` input for stable static snapshots where needed.
+- Yield deterministic output for identical inputs under the [accepted ID policy](docs/decisions/0003-scene-safe-svg-and-identifiers.md). The private serializer already accepts a validated `idPrefix` for stable output. The public static entry point is Phase 9 work.
 
 **Static SVG has no browser animation or events.** It should show the requested visual end state. Node-compatible generation is the preferred target and should be verified with a Node smoke test.
 
@@ -296,9 +296,9 @@ The final scene specification must define whether an overlay clips to its key, w
 
 Skin objects **only** describe resolved appearance: backgrounds, key fills, borders, radii, shadow/gradient treatments, label colors, active-state visuals, indicator styles, and animation defaults. A skin **MUST NOT** change pitch order, MIDI numbers, state semantics, event delivery, or input behavior.
 
-Initial skin set: `minimal`, `classic`, `modern`, `neon`, `dark`, plus a documented high-contrast skin or equivalent accessibility mode. A custom skin mechanism should accept validated appearance tokens without allowing arbitrary mutation of renderer internals.
+Phase 5 provides `minimal` and `classic`. `registerSkin(name, appearance)` validates and copies tokens into the keyboard instance, where `setSkin(name)` can select them. Phase 10 tracks `modern`, `neon`, `dark` and a high-contrast skin or equivalent accessibility mode. [Supported appearance tokens](README.md#skins-and-appearance)
 
-**Resolution order:** internal defaults → selected skin → user appearance overrides → accessibility overrides required by explicit settings. Key dimensions belong to sizing options.
+Resolution applies Minimal defaults, selected skin tokens and explicit instance overrides in that order. The accepted policy places explicit accessibility settings last when they are introduced. Key dimensions belong to sizing options. [Configuration ADR](docs/decisions/0001-notes-configuration-and-state.md)
 
 Keep styles scoped inside the component, including embedded and Anki usage. Avoid selectors that affect host `.card`, `body`, or generic `svg`/`rect` elements. Prefer inline SVG presentation attributes/embedded scoped styles where they improve standalone export and host isolation; define a consistent strategy so static and mounted output match. SVG definitions (gradients, filters, masks) require collision-safe IDs.
 
@@ -335,7 +335,8 @@ class PianoKeyboard {
   getPressedKeys(): number[];
   setRange(from: NoteInput, to: NoteInput): void;
   setOrientation(orientation: Orientation): void;
-  setSkin(skin: string | CustomSkin): void;   // exact type TBD
+  setSkin(name: string): void;
+  registerSkin(name: string, appearance: AppearanceOptions): void;
   setOptions(options: KeyboardOptionsPatch): void;
   resize(): void;
   destroy(): void;

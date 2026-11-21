@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeConfig } from '../../src/config/normalize.js';
 import type { ConfigOptions } from '../../src/config/normalize.js';
+import { minimalAppearance } from '../../src/skins/appearance.js';
 
 describe('configuration normalization', () => {
   it('resolves the approved core defaults', () => {
     expect(normalizeConfig()).toEqual({
       range: { from: 21, to: 108 },
       orientation: 'horizontal',
+      skin: 'minimal',
+      overrides: {},
+      appearance: minimalAppearance,
       notation: { accidentalPreference: 'sharp', octaveOffset: 0 },
       sizing: {
         mode: 'container',

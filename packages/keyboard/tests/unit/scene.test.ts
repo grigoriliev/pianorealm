@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { normalizeConfig } from '../../src/config/normalize.js';
 import { calculateLayout } from '../../src/geometry/layout.js';
 import { findNoteAtPoint } from '../../src/geometry/hit-testing.js';
-import { buildScene, minimalAppearance } from '../../src/scene/build-scene.js';
+import { buildScene } from '../../src/scene/build-scene.js';
+import { minimalAppearance } from '../../src/skins/appearance.js';
 import { serializeScene } from '../../src/svg/serialize.js';
 
 const ranges = [

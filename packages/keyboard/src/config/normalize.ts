@@ -1,3 +1,5 @@
+import { findSkin, minimalAppearance, normalizeAppearance, resolveAppearance } from '../skins/appearance.js';
+import type { AppearanceOptions, ResolvedAppearance } from '../skins/appearance.js';
 import { validateRecord } from '../internal/validate-record.js';
 import { defaultNotation, validateNotation } from '../notes/notation.js';
 import type { NotationOptions } from '../notes/notation.js';
@@ -35,6 +37,8 @@ export interface ConfigOptions {
   readonly orientation?: Orientation | undefined;
   readonly notation?: NotationOptions | undefined;
   readonly sizing?: SizingOptions | undefined;
+  readonly skin?: string | undefined;
+  readonly appearance?: AppearanceOptions | undefined;
 }
 
 interface ConfigSnapshot {
@@ -42,6 +46,9 @@ interface ConfigSnapshot {
   readonly orientation: Orientation;
   readonly notation: ReturnType<typeof validateNotation>;
   readonly sizing: ResolvedSizing;
+  readonly skin: string;
+  readonly overrides: AppearanceOptions;
+  readonly appearance: ResolvedAppearance;
 }
 
 const DEFAULT_RANGE = Object.freeze({ from: 21, to: 108 });
@@ -53,7 +60,7 @@ const DEFAULT_SIZING = Object.freeze({
   blackKeyHeight: 60,
 } satisfies ResolvedSizing);
 
-export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing'] as const;
+export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance'] as const;
 
 const SIZING_FIELDS = [...Object.keys(DEFAULT_SIZING), 'width', 'height'];
 
@@ -101,11 +108,16 @@ function resolveSizing(options: SizingOptions): ResolvedSizing {
   });
 }
 
+const EMPTY_OVERRIDES = Object.freeze({});
+
 const DEFAULT_CONFIG: ConfigSnapshot = Object.freeze({
   range: DEFAULT_RANGE,
   orientation: 'horizontal',
   notation: defaultNotation,
   sizing: DEFAULT_SIZING,
+  skin: 'minimal',
+  overrides: EMPTY_OVERRIDES,
+  appearance: minimalAppearance,
 });
 
 export function validateOrientation(orientation: Orientation): void {
@@ -115,7 +127,9 @@ export function validateOrientation(orientation: Orientation): void {
 }
 
 /** Validate a configuration patch and return a new snapshot. Commit it only after success. */
-export function normalizeConfig(patch: ConfigOptions = {}, previous = DEFAULT_CONFIG): ConfigSnapshot {
+export function normalizeConfig(
+  patch: ConfigOptions = {}, previous = DEFAULT_CONFIG, customSkins?: ReadonlyMap<string, AppearanceOptions>,
+): ConfigSnapshot {
   validateRecord(patch, CONFIG_FIELDS, 'configuration');
   const orientation = Object.hasOwn(patch, 'orientation')
     ? (patch.orientation === undefined ? DEFAULT_CONFIG.orientation : patch.orientation)
@@ -147,5 +161,19 @@ export function normalizeConfig(patch: ConfigOptions = {}, previous = DEFAULT_CO
     }
   }
 
-  return Object.freeze({ orientation, notation, range, sizing });
+  const skin = Object.hasOwn(patch, 'skin')
+    ? (patch.skin === undefined ? DEFAULT_CONFIG.skin : patch.skin)
+    : previous.skin;
+  if (typeof skin !== 'string') throw new TypeError('Skin must be a name');
+  const tokens = findSkin(skin, customSkins);
+  if (!tokens) throw new TypeError(`Unknown keyboard skin: "${skin}"`);
+  let overrides = previous.overrides;
+  if (Object.hasOwn(patch, 'appearance')) {
+    overrides = patch.appearance === undefined ? EMPTY_OVERRIDES : normalizeAppearance(patch.appearance, overrides);
+  }
+  const appearance = skin === previous.skin && overrides === previous.overrides
+    ? previous.appearance
+    : resolveAppearance(tokens, overrides);
+
+  return Object.freeze({ orientation, notation, range, sizing, skin, overrides, appearance });
 }

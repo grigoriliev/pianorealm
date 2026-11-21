@@ -1,7 +1,8 @@
-import { keyPresentation, minimalAppearance } from '../scene/build-scene.js';
+import { keyPresentation } from '../scene/build-scene.js';
 import type { KeyboardScene } from '../scene/build-scene.js';
 import type { Viewport } from './attributes.js';
-import { buildSvg, sizeSvg, updateKeyPresentation } from './dom-renderer.js';
+import { buildSvg, sizeSvg, updateKeyPresentation, updateSvgAppearance } from './dom-renderer.js';
+import { reserveLivePrefix } from './identifiers.js';
 import { measureContainer } from './measure.js';
 
 interface MountSizing {
@@ -23,9 +24,11 @@ export function validateContainer(container: HTMLElement): void {
 
 export class MountedSvg {
   readonly #container: HTMLElement;
-  readonly #sizing: MountSizing;
-  readonly #slot: HTMLElement;
-  #observer?: ResizeObserver;
+  #sizing: MountSizing;
+  #slot: HTMLElement;
+  #observer: ResizeObserver | undefined;
+  readonly #ids: ReturnType<typeof reserveLivePrefix>;
+  #appearance: KeyboardScene['appearance'];
   #drawing: ReturnType<typeof buildSvg>;
   #intrinsicSize: Viewport;
   #viewport: Viewport | null = null;
@@ -39,30 +42,24 @@ export class MountedSvg {
     this.#container = container;
     this.#sizing = sizing;
     this.#intrinsicSize = { width: scene.width, height: scene.height };
-    const document = container.ownerDocument;
-    this.#drawing = buildSvg(document, scene);
-    this.#slot = container;
-    if (sizing.mode === 'container') {
-      // Keep the rendered SVG out of host sizing so it cannot sustain a stale height
-      // or grow a content-sized host on every ResizeObserver notification.
-      this.#slot = document.createElement('div');
-      this.#slot.style.cssText = 'position:relative;display:block;width:0;height:0';
+    this.#appearance = scene.appearance;
+    this.#slot = this.#createSlot(sizing);
+    this.#ids = reserveLivePrefix(container);
+    try {
+      this.#drawing = buildSvg(container.ownerDocument, scene, this.#ids.prefix);
+      this.#position(this.#drawing.root, sizing);
+      Object.defineProperty(container, mountOwner, { value: true, configurable: true });
+    } catch (error) {
+      this.#ids.release();
+      throw error;
     }
-    this.#position(this.#drawing.root);
 
-    Object.defineProperty(container, mountOwner, { value: true, configurable: true });
     this.#active = true;
     try {
       this.resize();
       if (this.#slot !== container) {
         container.insertBefore(this.#slot, container.firstChild);
-        const Observer = document.defaultView?.ResizeObserver;
-        if (typeof Observer === 'function') {
-          this.#observer = new Observer(() => {
-            if (this.#active) this.resize();
-          });
-          this.#observer.observe(container);
-        }
+        this.#observer = this.#observe();
       }
     } catch (error) {
       this.destroy();
@@ -70,51 +67,100 @@ export class MountedSvg {
     }
   }
 
-  #position(root: SVGSVGElement): void {
-    if (this.#sizing.mode === 'container') {
+  #createSlot(sizing: MountSizing): HTMLElement {
+    if (sizing.mode === 'fixed') return this.#container;
+
+    // A zero-footprint slot prevents the drawing from contributing to host size.
+    const slot = this.#container.ownerDocument.createElement('div');
+    slot.style.cssText = 'position:relative;display:block;width:0;height:0';
+    return slot;
+  }
+
+  #observe(): ResizeObserver | undefined {
+    const Observer = this.#container.ownerDocument.defaultView?.ResizeObserver;
+    if (typeof Observer !== 'function') return;
+    const observer = new Observer(() => {
+      if (this.#active && this.#observer === observer) this.resize();
+    });
+    try {
+      observer.observe(this.#container);
+    } catch (error) {
+      observer.disconnect();
+      throw error;
+    }
+    return observer;
+  }
+
+  #position(root: SVGSVGElement, sizing: MountSizing): void {
+    if (sizing.mode === 'container') {
       root.style.cssText = 'position:absolute;top:0;left:0';
     }
   }
 
-  #measure(intrinsicSize: Viewport): Viewport | null {
-    if (this.#sizing.mode === 'container') {
+  #measure(intrinsicSize: Viewport, sizing: MountSizing): Viewport | null {
+    if (sizing.mode === 'container') {
       return measureContainer(this.#container);
     }
     return {
-      width: this.#sizing.width ?? intrinsicSize.width,
-      height: this.#sizing.height ?? intrinsicSize.height,
+      width: sizing.width ?? intrinsicSize.width,
+      height: sizing.height ?? intrinsicSize.height,
     };
   }
 
-  replace(scene: KeyboardScene): void {
-    const drawing = buildSvg(this.#container.ownerDocument, scene);
+  replace(scene: KeyboardScene, sizing: MountSizing): void {
+    const drawing = buildSvg(this.#container.ownerDocument, scene, this.#ids.prefix);
     const { root } = drawing;
+    this.#position(root, sizing);
     const previousRoot = this.#drawing.root;
-    this.#position(root);
-    const viewport = this.#measure(scene);
+    const changesMode = sizing.mode !== this.#sizing.mode;
+    const slot = changesMode ? this.#createSlot(sizing) : this.#slot;
+    const observer = changesMode && sizing.mode === 'container' ? this.#observe() : undefined;
+    let viewport: Viewport | null;
+    // Measure container mode without the old fixed SVG contributing to host size.
+    const detaching = changesMode && sizing.mode === 'container' && previousRoot.parentNode === this.#container;
+    const next = previousRoot.nextSibling;
+    if (detaching) previousRoot.remove();
+    try {
+      viewport = this.#measure(scene, sizing);
+      if (viewport) sizeSvg(root, viewport);
+    } catch (error) {
+      if (detaching) this.#container.insertBefore(previousRoot, next);
+      observer?.disconnect();
+      throw error;
+    }
+
     if (viewport) {
-      sizeSvg(root, viewport);
-      if (previousRoot.parentNode === this.#slot) {
-        this.#slot.replaceChild(root, previousRoot);
-      } else {
-        this.#slot.appendChild(root);
-      }
-    } else {
-      previousRoot.remove();
+      if (previousRoot.parentNode === slot) slot.replaceChild(root, previousRoot);
+      else slot.appendChild(root);
+    }
+    previousRoot.remove();
+    if (changesMode) {
+      if (this.#slot !== this.#container) this.#slot.remove();
+      if (slot !== this.#container) this.#container.insertBefore(slot, this.#container.firstChild);
+      this.#observer?.disconnect();
+      this.#observer = observer;
+      this.#slot = slot;
     }
 
     this.#drawing = drawing;
+    this.#sizing = sizing;
+    this.#appearance = scene.appearance;
     this.#intrinsicSize = { width: scene.width, height: scene.height };
     this.#viewport = viewport;
   }
 
+  restyle(scene: KeyboardScene): void {
+    updateSvgAppearance(this.#drawing, scene, this.#ids.prefix);
+    this.#appearance = scene.appearance;
+  }
+
   setKeyPressed(note: number, pressed: boolean): void {
     const nodes = this.#drawing.keys.get(note);
-    if (nodes) updateKeyPresentation(nodes, keyPresentation(nodes.kind, minimalAppearance, pressed));
+    if (nodes) updateKeyPresentation(nodes, keyPresentation(nodes.kind, this.#appearance, pressed), this.#ids.prefix);
   }
 
   resize(): void {
-    const viewport = this.#measure(this.#intrinsicSize);
+    const viewport = this.#measure(this.#intrinsicSize, this.#sizing);
     const { root } = this.#drawing;
     if (!viewport) {
       root.remove();
@@ -134,6 +180,7 @@ export class MountedSvg {
     try {
       this.#observer?.disconnect();
     } finally {
+      this.#ids.release();
       this.#drawing.root.remove();
       this.#drawing.keys.clear();
       if (this.#slot !== this.#container) this.#slot.remove();

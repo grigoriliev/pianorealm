@@ -1,4 +1,5 @@
-import type { KeyboardScene, SceneKey } from '../scene/build-scene.js';
+import { definitionReference } from './identifiers.js';
+import type { KeyboardScene, KeyPresentation, SceneKey } from '../scene/build-scene.js';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -31,14 +32,26 @@ export function backgroundAttributes(scene: KeyboardScene) {
   return { x: 0, y: 0, width: scene.width, height: scene.height, fill: scene.background };
 }
 
-export function keyAttributes(key: SceneKey) {
+export function keyAttributes(key: SceneKey, prefix: string) {
   const { x, y, width, height } = key.bounds;
   return {
     'data-note': key.note,
     x, y, width, height,
-    fill: key.fill,
+    ...keyStyleAttributes(key, prefix),
+  };
+}
+
+export function fillAttribute(key: KeyPresentation, prefix: string): string {
+  return typeof key.fill === 'string' ? key.fill : definitionReference(prefix, key.fill.slot);
+}
+
+export function keyStyleAttributes(key: SceneKey, prefix: string) {
+  return {
+    fill: fillAttribute(key, prefix),
     stroke: key.stroke,
-    'stroke-width': 1,
+    'stroke-width': key.strokeWidth,
+    rx: key.cornerRadius,
+    filter: key.shadow ? definitionReference(prefix, 'black-shadow') : 'none',
   };
 }
 

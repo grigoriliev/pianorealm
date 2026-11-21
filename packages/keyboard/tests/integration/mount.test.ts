@@ -1,10 +1,11 @@
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PianoKeyboard } from '../../src/index.js';
-import type { KeyboardOptions, NoteInput } from '../../src/index.js';
+import type { KeyboardOptions, KeyboardOptionsPatch, NoteInput } from '../../src/index.js';
 import { calculateLayout } from '../../src/geometry/layout.js';
 import { normalizeConfig } from '../../src/config/normalize.js';
-import { buildScene, minimalAppearance } from '../../src/scene/build-scene.js';
+import { buildScene } from '../../src/scene/build-scene.js';
+import { minimalAppearance } from '../../src/skins/appearance.js';
 import { SVG_NS } from '../../src/svg/attributes.js';
 import { serializeScene } from '../../src/svg/serialize.js';
 
@@ -52,6 +53,11 @@ function notes(root: Element): string[] {
 
 function svg(host = container): SVGSVGElement {
   return host.querySelector('svg')!;
+}
+
+function visiblePressed(root: Element, fill: string = minimalAppearance.pressed): number[] {
+  return Array.from(root.querySelectorAll(`[data-note][fill="${fill}"]`),
+    element => Number(element.getAttribute('data-note'))).sort((a, b) => a - b);
 }
 
 describe('mounted keyboard', () => {
@@ -227,11 +233,6 @@ describe('programmatic pressed keys', () => {
     return root.querySelector(`[data-note="${note}"]`)!;
   }
 
-  function visiblePressed(root: Element): number[] {
-    return Array.from(root.querySelectorAll(`[data-note][fill="${minimalAppearance.pressed}"]`),
-      element => Number(element.getAttribute('data-note'))).sort((a, b) => a - b);
-  }
-
   function watchChanges(host: Element) {
     const observer = new dom.window.MutationObserver(() => {});
     observer.observe(host, { childList: true, attributes: true, subtree: true });
@@ -397,6 +398,171 @@ describe('programmatic pressed keys', () => {
   });
 });
 
+describe('mounted appearance', () => {
+  it('switches skins in place and keeps key geometry, off-range notes and targeted updates', () => {
+    const piano = mount({ range: { from: 61, to: 65 }, orientation: 'vertical', sizing: { mode: 'fixed' } });
+    piano.setPressedKeys([0, 61, 62, 127]);
+    const root = svg();
+    const minimal = root.outerHTML;
+    const keys = Array.from(root.querySelectorAll('[data-note]'));
+    const circles = Array.from(root.querySelectorAll('circle'));
+    const shape = (key: Element) => ['data-note', 'x', 'y', 'width', 'height'].map(name => key.getAttribute(name));
+    const bounds = keys.map(shape);
+    const viewBox = root.getAttribute('viewBox');
+
+    piano.setSkin('classic');
+    expect(svg()).toBe(root);
+    expect(root.getAttribute('viewBox')).toBe(viewBox);
+    expect(Array.from(root.querySelectorAll('[data-note]')).every((node, index) => node === keys[index])).toBe(true);
+    expect(Array.from(root.querySelectorAll('circle')).every((node, index) => node === circles[index])).toBe(true);
+    expect(keys.map(shape)).toEqual(bounds);
+    expect(visiblePressed(root, '#85502b')).toEqual([61, 62]);
+    expect(piano.getPressedKeys()).toEqual([0, 61, 62, 127]);
+    const black = root.querySelector('[data-note="61"]')!;
+    const white = root.querySelector('[data-note="62"]')!;
+    expect(black.getAttribute('fill')).toBe('#85502b');
+    expect(white.getAttribute('fill')).toBe('#85502b');
+
+    const observer = new dom.window.MutationObserver(() => {});
+    observer.observe(root, { attributes: true, childList: true, subtree: true });
+    piano.releaseKey(61);
+    expect(black.getAttribute('fill')).toMatch(/^url\(#.*-black-gradient\)$/);
+    expect(white.getAttribute('fill')).toBe('#85502b');
+    expect(observer.takeRecords().map(record => [record.target, record.attributeName]))
+      .toEqual([[black, 'fill'], [circles[keys.indexOf(black)], 'display']]);
+    observer.disconnect();
+
+    piano.pressKey(61);
+    const classic = root.outerHTML;
+    for (let index = 0; index < 3; index++) {
+      piano.setSkin('minimal');
+      expect(root.outerHTML).toBe(minimal);
+      piano.setSkin('classic');
+      expect(root.outerHTML).toBe(classic);
+    }
+    const id = root.querySelector('linearGradient')!.id;
+    piano.setRange(126, 127);
+    expect(svg().querySelector('linearGradient')?.id).toBe(id);
+    expect(visiblePressed(svg(), '#85502b')).toEqual([127]);
+  });
+
+  it('validates updates atomically, preserves overrides across selection and resets merged fields', () => {
+    const piano = mount({ skin: 'classic', sizing: { mode: 'fixed' }, appearance: { white: '#123' } });
+    piano.setPressedKeys([0, 60, 127]);
+    const root = svg();
+    const markup = root.outerHTML;
+    const observer = new dom.window.MutationObserver(() => {});
+    observer.observe(root, { attributes: true, childList: true, subtree: true });
+    expect(() => piano.setSkin('missing')).toThrow(/Unknown keyboard skin/);
+    expect(() => piano.setSkin(undefined as unknown as string)).toThrow(TypeError);
+    expect(() => piano.setOptions({
+      skin: 'minimal', orientation: 'vertical', appearance: { background: 'transparent', white: 'url(#host)' },
+    })).toThrow(/appearance.white/);
+    expect(() => piano.setOptions({ container } as KeyboardOptionsPatch)).toThrow(/Unknown configuration field/);
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+    expect(svg()).toBe(root);
+    expect(root.outerHTML).toBe(markup);
+    expect(piano.getPressedKeys()).toEqual([0, 60, 127]);
+
+    const white = root.querySelector('[data-note="62"]')!;
+    piano.setSkin('minimal');
+    expect(white.getAttribute('fill')).toBe('#123');
+    piano.setSkin('classic');
+    const defs = root.querySelector('defs');
+    piano.setOptions({ appearance: { strokeWidth: 0, background: 'transparent' } });
+    expect(root.querySelector('defs')).toBe(defs);
+    expect(white.getAttribute('fill')).toBe('#123');
+    expect(white.getAttribute('stroke-width')).toBe('0');
+    expect(root.querySelector('rect:not([data-note])')?.getAttribute('fill')).toBe('transparent');
+    piano.setOptions({ appearance: { white: undefined } });
+    expect(white.getAttribute('fill')).toMatch(/^url\(/);
+    expect(white.getAttribute('stroke-width')).toBe('0');
+    piano.setOptions({ skin: undefined, appearance: undefined });
+    expect(white.getAttribute('fill')).toBe('#fafafa');
+    expect(white.getAttribute('stroke-width')).toBe('1');
+    expect(root.querySelector('defs')).toBeNull();
+  });
+
+  it('isolates registered tokens, definitions and cleanup across mounts and module copies', async () => {
+    const stops = [{ offset: 0, color: '#123' }, { offset: 1, color: '#456' }];
+    const options = { sizing: { mode: 'fixed' }, range: { from: 61, to: 63 } } as const;
+    const warmup = mount({ ...options, skin: 'classic' });
+    const collision = dom.window.document.createElement('span');
+    collision.id = svg().querySelector('linearGradient')!.id.replace(/-1-white-gradient$/, '-2-white-gradient');
+    warmup.destroy();
+    container.append(collision);
+
+    const first = mount(options);
+    expect(() => first.registerSkin('classic', {})).toThrow(/already registered/);
+    expect(() => first.registerSkin('Bad Name', {})).toThrow(TypeError);
+    expect(() => first.registerSkin('studio', { white: 'red' })).toThrow(TypeError);
+    first.registerSkin('studio', { white: { stops }, blackKeyShadow: 0.4 });
+    expect(() => first.registerSkin('studio', {})).toThrow(/already registered/);
+    stops[0].color = '#789';
+    first.setOptions({ skin: 'studio' });
+    const root = svg();
+    const id = root.querySelector('linearGradient')!.id;
+    expect(id).not.toBe(collision.id);
+    expect(root.querySelector('stop')?.getAttribute('stop-color')).toBe('#123');
+    expect(root.querySelector('[data-note="62"]')?.getAttribute('fill')).toBe(`url(#${id})`);
+
+    const other = dom.window.document.getElementById('other')!;
+    vi.resetModules();
+    const { PianoKeyboard: SecondCopy } = await import('../../src/index.js');
+    const second = new SecondCopy({ container: other, ...options, skin: 'classic' });
+    instances.push(second);
+    const otherRoot = svg(other);
+    expect(() => second.setSkin('studio')).toThrow(/Unknown keyboard skin/);
+    expect(otherRoot.querySelector('linearGradient')!.id).not.toBe(id);
+    expect(otherRoot.querySelector('[data-note="62"]')?.getAttribute('fill'))
+      .toBe(`url(#${otherRoot.querySelector('linearGradient')!.id})`);
+
+    first.destroy();
+    expect(dom.window.document.getElementById(id)).toBeNull();
+    expect(svg(other)).toBe(otherRoot);
+    for (const call of [() => first.setSkin('classic'), () => first.setOptions({}),
+      () => first.registerSkin('studio', {})]) expect(call).toThrow(/destroyed/);
+    const remount = mount({ ...options, skin: 'classic' });
+    expect(svg().querySelector('linearGradient')?.id).not.toBe(id);
+    expect(() => remount.setSkin('studio')).toThrow(/Unknown keyboard skin/);
+  });
+
+  it('reuses the observer for skin changes and rolls back a failed sizing-mode switch', () => {
+    setContentSize(120, 90);
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    dom.window.ResizeObserver = class {
+      observe = observe;
+      disconnect = disconnect;
+      unobserve() {}
+    };
+    const piano = mount();
+    const first = svg();
+    piano.setSkin('classic');
+    piano.setSkin('minimal');
+    expect(svg()).toBe(first);
+    expect(observe).toHaveBeenCalledOnce();
+    expect(disconnect).not.toHaveBeenCalled();
+    piano.setOptions({ sizing: { mode: 'fixed', width: 200 } });
+    const fixed = svg();
+    expect(fixed.getAttribute('width')).toBe('200');
+    expect(disconnect).toHaveBeenCalledOnce();
+
+    observe.mockImplementationOnce(() => { throw new Error('observe failed'); });
+    expect(() => piano.setOptions({ sizing: undefined, skin: 'classic' })).toThrow('observe failed');
+    expect(svg()).toBe(fixed);
+    expect(fixed.querySelector('defs')).toBeNull();
+    expect(disconnect).toHaveBeenCalledTimes(2);
+    piano.setOptions({ sizing: undefined, skin: 'classic' });
+    expect(svg().getAttribute('width')).toBe('120');
+    expect(svg().querySelectorAll('defs')).toHaveLength(1);
+    piano.destroy();
+    expect(disconnect).toHaveBeenCalledTimes(3);
+    expect(svg()).toBeNull();
+  });
+});
+
 describe('static parity', () => {
   it.each([
     { from: 60, to: 71, orientation: 'horizontal' },
@@ -432,6 +598,42 @@ describe('static parity', () => {
     expect(Array.from(pressedSvg.children, attributes)).toEqual(Array.from(domSvg.children, attributes));
     expect(notes(pressedSvg)).toEqual(notes(staticSvg));
     expect(pressedSvg.querySelectorAll('circle[display="inline"]')).toHaveLength(from === to ? 1 : 2);
+  });
+
+  it.each(['horizontal', 'vertical'] as const)('matches Classic and its definitions in %s orientation', orientation => {
+    const options = {
+      range: { from: 61, to: 63 }, orientation, skin: 'classic',
+      sizing: { mode: 'fixed', width: 150, height: 200 },
+      appearance: { strokeWidth: 0.5, pressed: '#097' },
+    } as const;
+    const piano = mount(options);
+    piano.setPressedKeys([0, 61, 62, 127]);
+    const config = normalizeConfig(options);
+    const layout = calculateLayout(config.range, config.orientation, config.sizing);
+    const scene = buildScene(config, layout, config.appearance, new Set(piano.getPressedKeys()));
+    const viewport = { width: 150, height: 200 };
+    const markup = serializeScene(scene, viewport, 'printed');
+    const parsed = new dom.window.DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+    const mounted = svg();
+    const prefix = mounted.querySelector('linearGradient')!.id.replace(/-white-gradient$/, '');
+    const describe = (element: Element, idPrefix: string): unknown => ({
+      name: element.localName,
+      namespace: element.namespaceURI,
+      attributes: Object.fromEntries(Array.from(element.attributes)
+        .filter(({ name }) => name !== 'xmlns')
+        .map(({ name, value }) => [name, value.replaceAll(`${idPrefix}-`, 'keyboard-')])),
+      children: Array.from(element.children, child => describe(child, idPrefix)),
+    });
+    expect(describe(parsed, 'printed')).toEqual(describe(mounted, prefix));
+    expect(notes(parsed)).toEqual(['62', '61', '63']);
+    expect(visiblePressed(parsed, '#097')).toEqual([61, 62]);
+    expect(parsed.querySelectorAll('linearGradient')).toHaveLength(2);
+    expect(parsed.querySelectorAll('feDropShadow')).toHaveLength(1);
+    expect(parsed.querySelector('[data-note="63"]')?.getAttribute('fill')).toBe('url(#printed-black-gradient)');
+    expect(parsed.querySelector('[data-note="63"]')?.getAttribute('filter')).toBe('url(#printed-black-shadow)');
+    expect(serializeScene(scene, viewport, 'printed')).toBe(markup);
+    expect(serializeScene(scene, viewport)).not.toBe(serializeScene(scene, viewport));
+    expect(() => serializeScene(scene, viewport, 'bad")')).toThrow(/idPrefix/);
   });
 
   it('escapes XML attribute values and rejects invalid XML code points', () => {

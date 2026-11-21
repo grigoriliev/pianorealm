@@ -4,7 +4,9 @@ import { calculateLayout } from '../geometry/layout.js';
 import { validateRecord } from '../internal/validate-record.js';
 import { normalizeNote } from '../notes/notation.js';
 import type { NoteInput } from '../notes/notation.js';
-import { buildScene, minimalAppearance } from '../scene/build-scene.js';
+import { buildScene } from '../scene/build-scene.js';
+import { findSkin, normalizeAppearance } from '../skins/appearance.js';
+import type { AppearanceOptions } from '../skins/appearance.js';
 import { PressedKeys } from '../state/pressed-keys.js';
 import { MountedSvg, validateContainer } from '../svg/mount.js';
 
@@ -14,21 +16,24 @@ type KeyboardContainer = typeof globalThis extends { HTMLElement: { prototype: i
   ? Element
   : never;
 
-export interface KeyboardOptions extends ConfigOptions {
+export type KeyboardOptionsPatch = ConfigOptions;
+
+export interface KeyboardOptions extends KeyboardOptionsPatch {
   readonly container: KeyboardContainer;
 }
 
 const OPTION_FIELDS = ['container', ...CONFIG_FIELDS];
 
-function prepareScene(config: ReturnType<typeof normalizeConfig>, pressed: PressedKeys) {
-  const layout = calculateLayout(config.range, config.orientation, config.sizing);
-  return buildScene(config, layout, minimalAppearance, pressed);
+function layoutFor(config: ReturnType<typeof normalizeConfig>) {
+  return calculateLayout(config.range, config.orientation, config.sizing);
 }
 
 /** A display-only piano keyboard mounted in a caller-provided HTML element. */
 export class PianoKeyboard {
   #config: ReturnType<typeof normalizeConfig>;
   #mount: MountedSvg | null;
+  #layout: ReturnType<typeof calculateLayout>;
+  readonly #skins = new Map<string, AppearanceOptions>();
   readonly #pressed = new PressedKeys();
 
   constructor(options: KeyboardOptions) {
@@ -36,7 +41,9 @@ export class PianoKeyboard {
     const { container, ...configOptions } = options;
     validateContainer(container);
     this.#config = normalizeConfig(configOptions);
-    this.#mount = new MountedSvg(container, prepareScene(this.#config, this.#pressed), this.#config.sizing);
+    this.#layout = layoutFor(this.#config);
+    const scene = buildScene(this.#config, this.#layout, this.#config.appearance, this.#pressed);
+    this.#mount = new MountedSvg(container, scene, this.#config.sizing);
   }
 
   /** Atomically replace the visually pressed notes, including those outside the displayed range. */
@@ -87,6 +94,29 @@ export class PianoKeyboard {
     this.#replace({ orientation });
   }
 
+  setSkin(skin: string): void {
+    this.#requireMount();
+    if (typeof skin !== 'string') throw new TypeError('Skin must be a name');
+    this.#replace({ skin });
+  }
+
+  /** Register a validated skin for this instance. Registration does not select it. */
+  registerSkin(name: string, appearance: AppearanceOptions): void {
+    this.#requireMount();
+    if (typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)) {
+      throw new TypeError('Skin name must start with a lowercase ASCII letter and contain only lowercase letters, digits or hyphens');
+    }
+    if (findSkin(name, this.#skins)) throw new TypeError(`Keyboard skin "${name}" is already registered`);
+    this.#skins.set(name, normalizeAppearance(appearance));
+  }
+
+  /** Merge validated configuration fields. Explicit undefined resets an optional field. */
+  setOptions(patch: KeyboardOptionsPatch): void {
+    this.#requireMount();
+    validateRecord(patch, CONFIG_FIELDS, 'configuration');
+    this.#replace(patch);
+  }
+
   resize(): void {
     this.#requireMount().resize();
   }
@@ -94,17 +124,29 @@ export class PianoKeyboard {
   destroy(): void {
     const mount = this.#mount;
     this.#mount = null;
+    this.#skins.clear();
     mount?.destroy();
   }
 
   #replace(patch: ConfigOptions): void {
     const mount = this.#requireMount();
-    const config = normalizeConfig(patch, this.#config);
-    if (config.range.from === this.#config.range.from && config.range.to === this.#config.range.to
-      && config.orientation === this.#config.orientation) {
-      return;
+    const previous = this.#config;
+    const config = normalizeConfig(patch, previous, this.#skins);
+    const { range, orientation, sizing, notation, appearance } = config;
+    const oldSizing = previous.sizing;
+    const changesLayout = range.from !== previous.range.from || range.to !== previous.range.to
+      || orientation !== previous.orientation || sizing.whiteKeyWidth !== oldSizing.whiteKeyWidth
+      || sizing.whiteKeyHeight !== oldSizing.whiteKeyHeight || sizing.blackKeyWidth !== oldSizing.blackKeyWidth
+      || sizing.blackKeyHeight !== oldSizing.blackKeyHeight;
+    const changesViewport = sizing.mode !== oldSizing.mode || sizing.width !== oldSizing.width
+      || sizing.height !== oldSizing.height;
+    if (changesLayout || changesViewport || notation !== previous.notation || appearance !== previous.appearance) {
+      const layout = changesLayout ? layoutFor(config) : this.#layout;
+      const scene = buildScene(config, layout, appearance, this.#pressed);
+      if (changesLayout || changesViewport) mount.replace(scene, sizing);
+      else mount.restyle(scene);
+      this.#layout = layout;
     }
-    mount.replace(prepareScene(config, this.#pressed));
     this.#config = config;
   }
 
