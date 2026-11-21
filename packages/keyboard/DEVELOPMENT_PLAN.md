@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Development Plan
 
-> **Status:** Planned · **Package:** `@pianorealm/keyboard` · **Last revised:** 2026-11-21  
+> **Status:** Active · **Package:** `@pianorealm/keyboard` · **Last revised:** 2026-11-21
 > **Scope:** First implementation of Pianorealm's framework-independent piano-keyboard visualization package.
 
 ## 1. Purpose and authority
@@ -9,11 +9,11 @@ This is the execution roadmap for implementing, verifying, documenting, and rele
 
 **Read alongside (in precedence order for their respective subjects):**
 
-1. [`../../../docs/ECOSYSTEM.md`](../../../docs/ECOSYSTEM.md) — ecosystem vision and package responsibilities.
-2. [`../../../docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) — cross-package rules and integration policy.
+1. [`../../docs/ECOSYSTEM.md`](../../docs/ECOSYSTEM.md) — ecosystem vision and package responsibilities.
+2. [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) — cross-package rules and integration policy.
 3. [`PROJECT_SPEC.md`](PROJECT_SPEC.md) — authoritative keyboard feature and release requirements.
 4. [`ARCHITECTURE.md`](ARCHITECTURE.md) — keyboard internals, invariants, and proposed designs.
-5. [`PROJECT_STATE.md`](PROJECT_STATE.md) — actual implementation progress, once created.
+5. [`PROJECT_STATE.md`](PROJECT_STATE.md) — actual implementation progress and verification.
 
 When a proposal conflicts with an existing accepted specification or ADR, stop that change, identify the conflict, and update the relevant authoritative document through review; do not silently alter contracts. This plan records intended work, **not evidence that implementation or testing has occurred**.
 
@@ -68,12 +68,12 @@ A typical task cycle:
 
 ## 4. Milestones at a glance
 
-Status values: **Not started / In progress / Blocked / Complete / Deferred**. All phases below are initially **Not started**; change status only with evidence.
+Status values: **Not started / In progress / Blocked / Complete / Deferred**. Change status only with evidence recorded in [`PROJECT_STATE.md`](PROJECT_STATE.md).
 
 | Phase | Milestone | Dependencies | Gate / tangible outcome | Status |
 | --- | --- | --- | --- | --- |
-| **0** | Architecture and ADRs | Existing ecosystem and package docs | Decisions and contracts documented | Not started |
-| **1** | Project foundation and note utilities | 0 | Tooling works; note/validation tests pass | Not started |
+| **0** | Architecture and ADRs | Existing ecosystem and package docs | Decisions and contracts documented | Complete |
+| **1** | Project foundation and note utilities | 0 | Tooling works; note/validation tests pass | Complete |
 | **2** | Pure geometry engine | 1 | Correct both-orientation layouts and edge cases | Not started |
 | **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Not started |
 | **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Not started |
@@ -90,24 +90,24 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Al
 
 **Objective:** Remove expensive ambiguities before implementing APIs, layout rules, or serialized output.
 
-**Tasks**
+**Planning scope**
 
-- [ ] Audit `PROJECT_SPEC.md`, keyboard `ARCHITECTURE.md`, and ecosystem docs for contradictions and missing acceptance tests.
-- [ ] Confirm package layout, module dependency direction, root exports, TypeScript strategy, and whether the first package uses a standalone repository-like layout or a workspace. **Do not require monorepo tooling.**
-- [ ] Finalize note names, octave offsets, enharmonics, inclusive ranges, invalid inputs, and single-note behavior.
-- [ ] Define virtual-white-key/black-key boundary strategy, geometry coordinate system, z-order, dimension defaults, and clipping/scroll rules.
-- [ ] Decide how pressed notes outside the visible range behave, how `getPressedKeys` is ordered, and whether no-op calls emit events.
-- [ ] Specify `setOptions` merge/validation/atomicity, skin override precedence, and effects of range/orientation/skin updates.
-- [ ] Define scene shape, safe label/overlay value policy, SVG definition ID isolation, and static/live serialization parity.
-- [ ] Define a **minimal** host-independent hit-test contract: coordinates, black-key precedence, bounds, and behavior outside the keyboard.
-- [ ] Define event payloads, subscription/disposal pattern, error handling, and minimal extension lifecycle **without** implementing input.
-- [ ] Decide actual ESM/UMD outputs, `Pianorealm` global shape, conditional exports, optional CommonJS, and CSS/asset packaging.
-- [ ] Define embedded baseline: supported APIs and fallbacks, Anki reinitialization rules, night mode, and testable client/version matrix.
-- [ ] Record accepted decisions as ADRs (package-level in `docs/decisions/`, ecosystem-level in root `docs/decisions/`); update `ARCHITECTURE.md` to reference them.
+- Audit `PROJECT_SPEC.md`, keyboard `ARCHITECTURE.md`, and ecosystem docs for contradictions and missing acceptance tests.
+- Confirm package layout, module dependency direction, root exports, TypeScript strategy, and whether the first package uses a standalone repository-like layout or a workspace. **Do not require monorepo tooling.**
+- Finalize note names, octave offsets, enharmonics, inclusive ranges, invalid inputs, and single-note behavior.
+- Define virtual-white-key/black-key boundary strategy, geometry coordinate system, z-order, dimension defaults, and clipping/scroll rules.
+- Decide how pressed notes outside the visible range behave, how `getPressedKeys` is ordered, and whether no-op calls emit events.
+- Specify `setOptions` merge/validation/atomicity, skin override precedence, and effects of range/orientation/skin updates.
+- Define scene shape, safe label/overlay value policy, SVG definition ID isolation, and static/live serialization parity.
+- Define a **minimal** host-independent hit-test contract: coordinates, black-key precedence, bounds, and behavior outside the keyboard.
+- Define event payloads, subscription/disposal pattern, error handling, and minimal extension lifecycle **without** implementing input.
+- Decide actual ESM/UMD outputs, `Pianorealm` global shape, conditional exports, optional CommonJS, and CSS/asset packaging.
+- Define embedded baseline: supported APIs and fallbacks, Anki reinitialization rules, night mode, and testable client/version matrix.
+- Record accepted decisions as ADRs (package-level in `docs/decisions/`, ecosystem-level in root `docs/decisions/`); update `ARCHITECTURE.md` to reference them.
 
 **Deliverables:** Approved architecture baseline, initial API/type sketch, ADRs for consequential decisions, risk register, geometry fixture list, explicit support-versus-untested policy, and updated `PROJECT_STATE.md`.
 
-**Gate:** A new implementer can answer how geometry, scene generation, state, and lifetime work without inventing behavior. No coding required in this phase.
+**Gate:** A new implementer can answer how geometry, scene generation, state, and lifetime work from the accepted decisions. See the [Phase 0 review](docs/PHASE_0_REVIEW.md) and [accepted ADRs](ARCHITECTURE.md#phase-0-review-references) for completion evidence and deferred verification.
 
 ## 6. Phase 1 — Tooling, note utilities, and configuration
 
@@ -115,13 +115,13 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Al
 
 **Tasks**
 
-- [ ] Create actual package configuration for `@pianorealm/keyboard`, TypeScript, Vite, Vitest, export entry points, and initial scripts.
-- [ ] Establish module folders and a small public entry (`src/index.ts`); avoid exposing internal types by accident.
-- [ ] Implement MIDI note classification (white/black), note-name parsing/formatting, accidental preference, octave conventions, and note-input normalization.
-- [ ] Implement inclusive range validation and normalized configuration defaults; reject invalid MIDI/fractional/non-finite values.
-- [ ] Define error types/messages and document invalid-input behavior.
-- [ ] Add unit tests for `C4 = 60`, octave boundaries, enharmonic equivalence, MIDI `0` and `127`, bad note strings, reversed ranges, and option validation.
-- [ ] Build/typecheck/test an empty-but-functional public package; do not fabricate renderer functionality yet.
+- [x] Create actual package configuration for `@pianorealm/keyboard`, TypeScript, Vite, Vitest, export entry points, and initial scripts.
+- [x] Establish module folders and a small public entry (`src/index.ts`); avoid exposing internal types by accident.
+- [x] Implement MIDI note classification (white/black), note-name parsing/formatting, accidental preference, octave conventions, and note-input normalization.
+- [x] Implement inclusive range validation and normalized configuration defaults; reject invalid MIDI/fractional/non-finite values.
+- [x] Define error types/messages and document invalid-input behavior.
+- [x] Add unit tests for `C4 = 60`, octave boundaries, enharmonic equivalence, MIDI `0` and `127`, bad note strings, reversed ranges, and option validation.
+- [x] Build, type-check, and test the local ESM note utility package.
 
 **Gate:** Note utility and configuration tests pass; the package can be built, imported, and typechecked locally; no DOM dependency in utility modules.
 
@@ -336,11 +336,9 @@ pianorealm/
 
 For each phase task, specify: **objective; authority documents; current state; included files/behaviors; excluded work; relevant ADRs; acceptance tests; actual commands to run; completion report; state update**. Ask for review separately if the change is consequential; don't ask the AI to invent successful results when it cannot execute tests.
 
-## 19. Initial project state and immediate next step
+## 19. Project state and next task
 
-As of this document's creation, **no phase is claimed complete**. Existing planning documents do not establish that the package source, tests, or build currently exist. Establish actual status from the repository before updating phase labels.
-
-**Next task:** Perform **Phase 0**, resolve the highest-impact decisions (geometry endpoints, out-of-range pressed state, scene/ID design, integration hit-testing, browser global), then create `PROJECT_STATE.md` with the accepted decisions, evidence, and Phase 1 task list.
+See [`PROJECT_STATE.md`](PROJECT_STATE.md) for the verified implementation, last check results, and next bounded task.
 
 ## 20. Release readiness checklist
 
