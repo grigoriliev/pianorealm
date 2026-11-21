@@ -1,0 +1,75 @@
+body {
+  margin: 0;
+  background: #f4f5f7;
+  color: #1f2733;
+  font: 1rem system-ui, sans-serif;
+}
+
+main {
+  max-width: 73rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+h1 {
+  margin: 0 0 1.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  letter-spacing: -0.025em;
+}
+
+.samples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.sample {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #d9dfe7;
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+#full {
+  grid-column: 1 / -1;
+}
+
+.sample header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.sample h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sample button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d9dfe7;
+  border-radius: 0.35rem;
+  background: #f4f5f7;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sample button:hover {
+  background: #e9edf2;
+}
+
+.keyboard-host {
+  overflow: auto;
+}
+
+@media (max-width: 42rem) {
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

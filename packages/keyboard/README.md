@@ -19,6 +19,18 @@ The build generates `dist/pianorealm-keyboard.esm.js` and `dist/index.d.ts`. Fro
 node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard"; console.log(normalizeNote("C4"))'
 ```
 
+## Development demo
+
+Run `npm ci` if dependencies are missing, then start the demo from `packages/keyboard`:
+
+```sh
+npm run dev:demo
+```
+
+Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
+
+Each **Download SVG** button saves the SVG currently mounted in that card. The demo uses the source entry point, so it works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+
 ## Note utilities
 
 - `normalizeNote(note, notation?)` returns a MIDI integer from 0 through 127. It accepts a MIDI number or a trimmed string with an ASCII letter A–G (case-insensitive), one optional accidental (`#`, `b`, `♯`, or `♭`), and a decimal octave with an optional leading minus. The accidental is applied before range validation. For example, B#3 maps to 60 and Cb4 maps to 59. Numeric strings, a leading plus, and double accidentals are invalid.

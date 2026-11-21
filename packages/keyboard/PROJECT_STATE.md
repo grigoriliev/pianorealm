@@ -14,7 +14,7 @@
 
 ## Phase 3 handoff
 
-The verified implementation is in the working tree on `main`, based on `d88bdbb`. Phase 3 is complete and Phase 4 is pending. Review the working tree, including untracked Phase 3 source and test files, when resuming.
+The Phase 3 implementation and handoff are recorded in `df1dc7b`. Phase 3 is complete and Phase 4 is pending.
 
 ### Implementation decisions
 
@@ -53,6 +53,21 @@ Commands ran from `packages/keyboard` with Node 24.22.1 and npm 11.19.1 unless a
 | `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022 --module NodeNext "$consumer_dir/node.mts"` and `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022,DOM --module NodeNext "$consumer_dir/browser.mts"` | Both passed against built declarations from temporary note-only and browser consumer files. |
 | `python3 /tmp/pianorealm-phase3.a93ck6/firefox-smoke.py packages/keyboard/dist/pianorealm-keyboard.esm.js` from the repository root | Passed during Phase 3 implementation in headless Firefox 160.0.1 using a temporary local HTML fixture and Marionette. Verified a padded and bordered 100 × 100 content box, 34 px letterboxing in both orientations, black-key stacking, viewport clipping, fractional observer resize, zero-size and disconnected recovery, independent instances, cross-copy host ownership, and remount after repeated destruction. The README records a manual fit and lifecycle procedure. |
 | `git diff --check`, `git status --short --untracked-files=all` from the repository root | Whitespace check passed. Status showed Phase 3 files, the root README update and the pre-existing untracked `packages/keyboard/.gitignore`. |
+
+## Development demo
+
+The separate `demo/` directory contains a Vite page with horizontal and vertical C3–C5 examples and a horizontal A0–C8 example. It imports `PianoKeyboard` from the public source entry point and uses fixed intrinsic sizing so the rendered SVG can be saved as-is. Each download uses the browser's `XMLSerializer` on the root SVG in the demo's own mount container. The production bundle and declarations still build from `src/`. [Run instructions](README.md#development-demo)
+
+Checks ran from `packages/keyboard` with Node 24.22.1 and npm 11.19.1.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build` | Passed. Type checking includes the demo, Vitest passed all 148 tests across five files, and Vite and TypeScript emitted the production ESM bundle, source map, and declarations. The source map and output inspection confirmed that demo files were excluded. |
+| `npm run dev:demo -- --strictPort` | The sandbox denied the localhost bind. The browser smoke below started the same dev script with loopback access. |
+| `python3 /tmp/pianorealm-demo.OsnVSS/smoke.py` | Passed. The temporary smoke script launched `npm run dev:demo -- --strictPort --port 44051` on loopback and opened `/demo/` in headless Firefox 160.0.1. All three keyboards rendered with the expected MIDI notes and viewBox. Browser clicks saved three standalone SVG files that matched their mounted roots byte for byte. At a 480 px viewport, the full keyboard scrolled within its card. |
+| `git diff --check` from the repository root | Passed. |
+
+Download prompts and rendering in other browsers, mobile devices, and embedded webviews remain untested. Phase 4 remains the next library task.
 
 ## Phase 2 completion gate
 

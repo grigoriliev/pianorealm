@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keyboard rendering demo</title>
+    <link rel="stylesheet" href="./demo.css">
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Keyboard rendering demo</h1>
+      <div class="samples">
+        <section id="horizontal" class="sample" aria-labelledby="horizontal-title">
+          <header>
+            <h2 id="horizontal-title">Horizontal · C3–C5</h2>
+            <button type="button" aria-label="Download horizontal C3–C5 SVG">Download SVG</button>
+          </header>
+          <div class="keyboard-host"></div>
+        </section>
+        <section id="vertical" class="sample" aria-labelledby="vertical-title">
+          <header>
+            <h2 id="vertical-title">Vertical · C3–C5</h2>
+            <button type="button" aria-label="Download vertical C3–C5 SVG">Download SVG</button>
+          </header>
+          <div class="keyboard-host"></div>
+        </section>
+        <section id="full" class="sample" aria-labelledby="full-title">
+          <header>
+            <h2 id="full-title">88 keys · A0–C8</h2>
+            <button type="button" aria-label="Download full A0–C8 SVG">Download SVG</button>
+          </header>
+          <div class="keyboard-host"></div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
