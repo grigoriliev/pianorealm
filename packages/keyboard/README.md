@@ -1,6 +1,6 @@
 # @pianorealm/keyboard
 
-Phase 2 adds a DOM-independent geometry engine and logical point lookup to the Pianorealm keyboard visualization package. The private package builds a local ESM entry with TypeScript declarations for its public note utilities. [Project state](PROJECT_STATE.md)
+The Pianorealm keyboard package renders a display-only piano as SVG. The private package provides an ESM entry with TypeScript declarations for the mounted keyboard and note utilities. [Project state](PROJECT_STATE.md)
 
 ## Development
 
@@ -27,12 +27,39 @@ node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard
 
 The root also exports the types `NoteInput`, `NotationOptions`, and `KeyKind`. Malformed syntax, unsupported argument types, and unknown option fields throw `TypeError`. Numeric domain violations throw `RangeError`.
 
-## Internal configuration
+## Mount a keyboard
+
+Give the HTML host an available content-box width and height for the default container sizing mode. For example, put the following markup in a page served over local HTTP:
+
+```html
+<div id="piano" style="width: 320px; height: 160px;"></div>
+<script type="module">
+  import { PianoKeyboard } from './dist/pianorealm-keyboard.esm.js';
+
+  const piano = new PianoKeyboard({
+    container: document.getElementById('piano'),
+    range: { from: 'C#4', to: 'D#4' },
+  });
+
+  piano.setRange('C3', 'C5');
+  piano.setOrientation('vertical');
+  piano.resize();
+  // Call piano.destroy() when the host is disposed.
+</script>
+```
+
+The constructor accepts `container`, `range`, `orientation`, `notation` and `sizing` through `KeyboardOptions`. The `Orientation` type is `'horizontal' | 'vertical'`. Range and orientation updates validate before replacing the current drawing. Each host allows one live keyboard, and `destroy()` removes that keyboard's content while preserving the host's other children and styles. Repeated `destroy()` calls are safe. The other instance methods throw after destruction.
+
+Container mode fits the intrinsic geometry inside the content box with uniform scaling and centered letterboxing. A disconnected, hidden, or zero-size host waits for a usable viewport. The adapter observes size changes where `ResizeObserver` is available. Use `resize()` after a host change if observation is unavailable or you need an immediate update. In fixed mode, `sizing.width` and `sizing.height` set the viewport in CSS pixels, with each omitted dimension taken from the oriented geometry. Fixed keyboards can be constructed while their host is detached.
+
+To check fitting manually, leave the C♯4–D♯4 range horizontal and set the host content box to 100 × 100 px. The 32 × 100 keyboard is centered with 34 px on either side. Switch to vertical and check that the 100 × 32 keyboard is centered with 34 px above and below. Set the host height to zero, call `resize()`, then restore the height and call `resize()` again. Mount a second keyboard in a separate host and verify that destroying the first leaves the second visible.
+
+## Configuration
 
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
-A patch merges notation and sizing fields and replaces a range as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value and an explicit `undefined` resets it. Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. Validated configuration is returned as a frozen snapshot, and a rejected patch leaves the previous snapshot unchanged.
+Internally, configuration patches merge notation and sizing fields and replace a range as a whole. New range names use the patched notation, while existing ranges retain their MIDI identities. An omitted field keeps its current value and an explicit `undefined` resets it. Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. Validated configuration is returned as a frozen snapshot, and a rejected patch leaves the previous snapshot unchanged.
 
 ## Internal geometry
 
-The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The next milestone is to use this layout in the shared SVG scene. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
+The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serialization prototype use the same scene derived from this layout. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)

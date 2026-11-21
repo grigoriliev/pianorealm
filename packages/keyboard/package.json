@@ -2,7 +2,7 @@
   "name": "@pianorealm/keyboard",
   "version": "0.0.0",
   "private": true,
-  "description": "DOM-independent note utilities for the Pianorealm keyboard visualization package",
+  "description": "Framework-independent SVG piano keyboard visualization",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -20,7 +20,9 @@
     "build": "vite build && tsc -p tsconfig.build.json"
   },
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^22.0.0",
+    "jsdom": "^26.1.0",
     "typescript": "~5.9.3",
     "vite": "^7.0.0",
     "vitest": "^4.0.0"

@@ -75,7 +75,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **0** | Architecture and ADRs | Existing ecosystem and package docs | Decisions and contracts documented | Complete |
 | **1** | Project foundation and note utilities | 0 | Tooling works; note/validation tests pass | Complete |
 | **2** | Pure geometry engine | 1 | Correct both-orientation layouts and edge cases | Complete |
-| **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Not started |
+| **3** | Shared scene + minimal live SVG | 2 | Mount/render/destroy; basic static-scene parity | Complete |
 | **4** | Pressed-key visual state | 3 | Stable state API and targeted updates | Not started |
 | **5** | Skins and customization | 4 | Skin-independent state; baseline themes | Not started |
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Not started |
@@ -147,14 +147,14 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Build a DOM-independent scene representation from normalized config, layout, and a minimal resolved style.
-- [ ] Define stable visual element identity, white/black stacking, safe text and attribute construction boundaries.
-- [ ] Implement minimal SVG DOM adapter: construct, mount into a provided container, update structural settings, and destroy.
-- [ ] Support configurable range and orientation; render a basic Minimal appearance only.
-- [ ] Implement core `PianoKeyboard` construction, `setRange`, `setOrientation`, `resize`, and `destroy` as applicable to this phase.
-- [ ] Ensure instance-local root elements and safe repeated setup/teardown; avoid unscoped styles or global IDs.
-- [ ] Add scene and DOM integration tests for SVG structure, notes present, layer order, multiple instances and destruction.
-- [ ] Add an early static serializer prototype or parity fixture using **the same scene** (full public static API may arrive in Phase 9).
+- [x] Build a DOM-independent scene representation from normalized config, layout, and a minimal resolved style.
+- [x] Define stable visual element identity, white/black stacking, safe text and attribute construction boundaries.
+- [x] Implement minimal SVG DOM adapter: construct, mount into a provided container, update structural settings, and destroy.
+- [x] Support configurable range and orientation; render a basic Minimal appearance only.
+- [x] Implement core `PianoKeyboard` construction, `setRange`, `setOrientation`, `resize`, and `destroy` as applicable to this phase.
+- [x] Ensure instance-local root elements and safe repeated setup/teardown; avoid unscoped styles or global IDs.
+- [x] Add scene and DOM integration tests for SVG structure, notes present, layer order, multiple instances and destruction.
+- [x] Add an early static serializer prototype or parity fixture using **the same scene** (full public static API may arrive in Phase 9).
 
 **Gate:** A basic piano mounts and renders correctly in both orientations; scene is usable without the browser DOM; basic lifecycle tests pass.
 

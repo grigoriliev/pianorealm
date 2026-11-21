@@ -53,6 +53,8 @@ const DEFAULT_SIZING = Object.freeze({
   blackKeyHeight: 60,
 } satisfies ResolvedSizing);
 
+export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing'] as const;
+
 const SIZING_FIELDS = [...Object.keys(DEFAULT_SIZING), 'width', 'height'];
 
 function positiveDimension(value: number, name: string): number {
@@ -114,7 +116,7 @@ export function validateOrientation(orientation: Orientation): void {
 
 /** Validate a configuration patch and return a new snapshot. Commit it only after success. */
 export function normalizeConfig(patch: ConfigOptions = {}, previous = DEFAULT_CONFIG): ConfigSnapshot {
-  validateRecord(patch, ['range', 'orientation', 'notation', 'sizing'], 'configuration');
+  validateRecord(patch, CONFIG_FIELDS, 'configuration');
   const orientation = Object.hasOwn(patch, 'orientation')
     ? (patch.orientation === undefined ? DEFAULT_CONFIG.orientation : patch.orientation)
     : previous.orientation;

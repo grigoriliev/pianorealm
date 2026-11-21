@@ -1,22 +1,64 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 2 · **Phase 2:** Complete
+> **Status:** Implementation · **Last completed phase:** Phase 3 · **Phase 3:** Complete
 > **Last verified:** 2026-11-21 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
 
 - Phase 0 is complete. The review records the approved baseline and expected results for the geometry tests. [Phase 0 review](docs/PHASE_0_REVIEW.md) · [Accepted ADRs](ARCHITECTURE.md#phase-0-review-references)
-- Phase 1 meets the [completion gate](DEVELOPMENT_PLAN.md#6-phase-1--tooling-note-utilities-and-configuration). The keyboard package installs independently from a package-local lockfile and uses strict TypeScript, Vite, and Vitest. The private package has no runtime dependencies. Its root export map exposes ESM and declarations for `normalizeNote`, `formatNote`, `classifyNote`, and their public types. [Repository topology ADR](../../docs/decisions/0001-repository-topology.md) · [Distribution ADR](../../docs/decisions/0002-standalone-global-namespace.md)
+- Phase 1 meets the [completion gate](DEVELOPMENT_PLAN.md#6-phase-1--tooling-note-utilities-and-configuration). The keyboard package installs independently from a package-local lockfile and uses strict TypeScript, Vite, and Vitest. The private package has no runtime dependencies. Phase 1 established the ESM entry point and declarations for `normalizeNote`, `formatNote`, `classifyNote`, and their public types. [Repository topology ADR](../../docs/decisions/0001-repository-topology.md) · [Distribution ADR](../../docs/decisions/0002-standalone-global-namespace.md)
 - MIDI integers 0–127 are canonical. Note names use C4 = 60 by default and accept enharmonic spellings across octave boundaries. The implementation requires safe-integer octave offsets and uses exact integer arithmetic so extreme valid offsets still round-trip. Ranges are inclusive and accept a single note. [Note and configuration ADR](docs/decisions/0001-notes-configuration-and-state.md) · [Package README](README.md)
 - Internal configuration returns a frozen snapshot after validation. A patch replaces the range as a pair, merges declared notation and sizing fields, and uses explicit `undefined` to reset values. Patched notation applies to new range names. Existing MIDI endpoints retain their identity. Dimensions live under sizing. Defaults are horizontal, MIDI 21–108, container sizing, and white/black pitch widths and depths of 20 × 100 and 12 × 60. [Note and configuration ADR](docs/decisions/0001-notes-configuration-and-state.md) · [Layout and sizing ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
-- The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. The root package exports remain the Phase 1 note utilities.
+- The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
+
+## Phase 3 handoff
+
+The verified implementation is in the working tree on `main`, based on `d88bdbb`. Phase 3 is complete and Phase 4 is pending. Review the working tree, including untracked Phase 3 source and test files, when resuming.
+
+### Implementation decisions
+
+- `src/scene/build-scene.ts` combines the frozen Phase 2 layout with Minimal paint and a generated name. MIDI note numbers are stable scene identities. The scene carries layout bounds and draw order directly. `src/svg/attributes.ts` defines the supported attribute sets for the namespaced DOM adapter and private XML serializer. Solid paint and a direct `aria-label` require no ID references. [Shared scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md)
+- The package root adds `PianoKeyboard`, `KeyboardOptions` and `Orientation`. The controller validates and derives structural replacements before committing them. The adapter uses centered uniform SVG fitting, measures container content size, and falls back to oriented intrinsic dimensions for omitted fixed axes. Its zero-footprint slot keeps container-mode SVG from contributing to the host's height. [Sizing ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
+- Each HTML host allows one live owner across library copies. The mounted adapter feature-detects `ResizeObserver` and also supports explicit `resize()`. Teardown removes the owned SVG and slot, disconnects observation and releases the host reservation. Repeated `destroy()` is safe, and the other instance methods throw after destruction. [Lifecycle ADR](docs/decisions/0004-lifecycle-events-and-embedded-hosts.md)
+
+### Completion criteria
+
+All eight criteria passed. [Phase 3 prompt](prompts/01-implementation/phase-03-shared-scene-svg-rendering.md#phase-3-completion-gate) · [Development plan](DEVELOPMENT_PLAN.md#8-phase-3--shared-scene-model-and-minimal-mounted-svg)
+
+| Criterion | Evidence |
+| --- | --- |
+| Mount a Minimal keyboard in a caller-provided element | The DOM integration suite verifies namespaced SVG and the default 88-note mount. The Firefox smoke verified drawing, centered letterboxing and clipping in the caller's content box. |
+| Match Phase 2 geometry, ordering and note identity | The scene suite compares all keys against Phase 2 for six ranges in both orientations. The DOM and parsed XML parity fixtures include a vertical black-endpoint range and a single black key. |
+| Share a DOM-independent scene | The Node scene suite runs without `window` or `document`. Live SVG and parsed serialization agree on the root attributes and per-key geometry, paint, and MIDI order. |
+| Verify range, orientation, resize and destroy | The integration suite covers range and orientation changes, fixed dimensions, container measurement, disconnected and zero-size recovery, and post-destroy errors. Firefox verified real observer recovery and reattachment. |
+| Preserve state and isolate instances | Tests cover invalid and overflowing range updates, failed observer setup rollback, duplicate mounts, unrelated host content, independent instances and idempotent cleanup. Firefox confirmed host ownership across two library copies. |
+| Produce safe and accessible SVG | Tests verify the image role and accessible name, absence of tab stops and generated IDs, XML attribute escaping, and rejection of invalid XML characters. |
+| Execute scene, DOM, parity and regression tests | Vitest passed all 148 tests across five files. |
+| Pass type checking and build, and record evidence | Both commands passed at handoff. Verification details and outstanding compatibility checks are recorded below. |
+
+## Phase 3 verification
+
+Commands ran from `packages/keyboard` with Node 24.22.1 and npm 11.19.1 unless a repository-root location is given.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build` before edits | Passed. Vitest ran all 124 Phase 1–2 tests across three files. |
+| `npm install --save-dev jsdom@26.1.0 @types/jsdom@21.1.7 --ignore-scripts --cache /tmp/pianorealm-npm-cache --fetch-retries=0 --fetch-timeout=8000` | Succeeded with registry access after sandbox DNS failed. The package-local dev dependencies support the declared Node 22.12 floor by their engine ranges. npm reported a transitive `whatwg-encoding` deprecation and zero audit findings. |
+| `npm run typecheck` at handoff | Passed with no TypeScript diagnostics. |
+| `npm test` at handoff | Passed all 148 tests across five files, including 24 Phase 3 tests and the 124 Phase 1–2 tests. |
+| `npm run build` at handoff | Passed. Vite emitted the ESM bundle and source map, and TypeScript emitted declarations. |
+| `node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard"; console.log(normalizeNote("C4"))'` at handoff | Printed `60` using the built ESM entry. |
+| `node --input-type=module` with inline assertions | Passed. Node imported the built package without DOM globals, exposed the class and three note utilities, and rejected a serializer deep import. The pure serializer also ran under Vitest's Node environment. |
+| `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022 --module NodeNext "$consumer_dir/node.mts"` and `./node_modules/.bin/tsc --noEmit --strict --target ES2022 --lib ES2022,DOM --module NodeNext "$consumer_dir/browser.mts"` | Both passed against built declarations from temporary note-only and browser consumer files. |
+| `python3 /tmp/pianorealm-phase3.a93ck6/firefox-smoke.py packages/keyboard/dist/pianorealm-keyboard.esm.js` from the repository root | Passed during Phase 3 implementation in headless Firefox 160.0.1 using a temporary local HTML fixture and Marionette. Verified a padded and bordered 100 × 100 content box, 34 px letterboxing in both orientations, black-key stacking, viewport clipping, fractional observer resize, zero-size and disconnected recovery, independent instances, cross-copy host ownership, and remount after repeated destruction. The README records a manual fit and lifecycle procedure. |
+| `git diff --check`, `git status --short --untracked-files=all` from the repository root | Whitespace check passed. Status showed Phase 3 files, the root README update and the pre-existing untracked `packages/keyboard/.gitignore`. |
 
 ## Phase 2 completion gate
 
 - **Passed** — The geometry fixture suite verifies white slots, black seams, endpoint unions, full viewport depth, draw order, and vertical rotation. The all-ranges checks verify complete, unique notes with finite, nonnegative bounds at default sizing.
 - **Passed** — The suite covers deterministic frozen results, fractional and extreme representable dimensions, invalid inputs, and half-open logical point lookup with black-key precedence. The plain Node invocation and root export check verified DOM independence and package privacy.
-- **Passed** — All package checks passed on the handoff checkout, including the Phase 1 regression suite. The matching development plan marks Phase 2 complete and Phase 3 pending. [Phase 2 gate](DEVELOPMENT_PLAN.md#7-phase-2--deterministic-keyboard-geometry)
+- **Passed** — All package checks passed on the handoff checkout, including the Phase 1 regression suite. Phase 2 was complete at handoff. [Phase 2 gate](DEVELOPMENT_PLAN.md#7-phase-2--deterministic-keyboard-geometry)
 
 ## Phase 2 verification
 
@@ -52,9 +94,9 @@ From the repository root, `git diff --check` passed and `git status --short --un
 
 - The sandbox can block the esbuild install script. The offline retry used the existing npm cache and the installed native binary worked for both Vitest and Vite. This checkout also needed the IDE-provided Node runtime added to `PATH`.
 - Geometry throws `RangeError` when individually finite sizing values would make the selected range's intrinsic extent overflow. Fractional coordinates use floating-point precision. A rotated edge that rounds beyond the viewport moves inward by one floating-point step. Integer fixture coordinates are exact. With an extreme width ratio, a key's far edge can round to its start, leaving no hittable interval even though the key record retains a positive width. The Node probe reproduced this for C4–C♯4 with a black-key width of `Number.EPSILON`.
-- The declared Node 22 development baseline, browser and Anki compatibility, and classic-script loading remain unverified. Standalone packaging, CommonJS, and optional public key bounds remain deferred.
-- Scene/SVG output and mounted lifecycle are Phase 3 work. The mounted adapter owns host fitting and measurement, including centered uniform contain scaling. Browser rendering and host-fit behavior remain unverified. Public hit testing and client-coordinate conversion remain Phase 8 work.
+- Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
+- Later milestones cover pressed-key state (Phase 4), customization (Phase 5), advanced sizing and motion (Phase 6), overlays (Phase 7), events and public hit testing (Phase 8), and the public static SVG API, classic-script output, and Anki verification (Phase 9). CommonJS and optional public key bounds remain deferred.
 
 ## Next task
 
-Begin [Phase 3](DEVELOPMENT_PLAN.md#8-phase-3--shared-scene-model-and-minimal-mounted-svg) with a DOM-independent scene builder that consumes the frozen layout and uses its existing bounds and draw order. Verify both orientations at the scene boundary before mounting minimal SVG. [Shared scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md)
+Begin Phase 4 with DOM-independent pressed-note storage. Use the instance notation when ingesting names, store canonical MIDI numbers independently of the visible range, and return a fresh ascending array. Test atomic replacement after invalid input, deduplication, repeated-operation no-ops, and restoring an offscreen pressed note by changing the range. Then extend the shared scene and mounted adapter so state-only changes update only affected visible key nodes. [Phase 4 plan](DEVELOPMENT_PLAN.md#9-phase-4--programmatic-pressed-key-state) · [Visual state ADR](docs/decisions/0001-notes-configuration-and-state.md)
