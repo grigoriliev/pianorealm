@@ -351,9 +351,9 @@ def run():
 def start():
     try:
         run()
+        aqt.mw.unloadProfileAndExit()
     except Exception:
         log("FAIL", traceback=traceback.format_exc())
-    finally:
-        aqt.mw.app.quit()
+        aqt.mw.app.exit(1)
 
 gui_hooks.profile_did_open.append(lambda: QTimer.singleShot(1200, start))

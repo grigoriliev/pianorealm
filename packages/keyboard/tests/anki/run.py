@@ -37,23 +37,42 @@ manager.save()
 """
 
 # Anki serves its review content on loopback. Bring up only that interface.
-OFFLINE = """
+OFFLINE = r"""
 ip link set lo up
 ip -br address
-test "$(ip -o link show | wc -l)" -eq 1
-test -z "$(ip route show)"
-test -z "$(ip -6 route show default)"
+interfaces=$(ip -o link show)
+ipv4_routes=$(ip route show)
+ipv6_default=$(ip -6 route show default)
+if [ "$(printf '%s\n' "$interfaces" | wc -l)" -ne 1 ] ||
+   [ -n "$ipv4_routes" ] || [ -n "$ipv6_default" ]; then
+    echo "Expected an isolated network namespace with only loopback" >&2
+    exit 1
+fi
 exec "$@"
 """
+
+
+def wait_for_process(command, *, timeout, **options):
+    with subprocess.Popen(command, start_new_session=True, **options) as process:
+        try:
+            return process.wait(timeout=timeout)
+        finally:
+            # QtWebEngine and other subprocesses inherit the group, even if the launcher exits first.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def seed_profile(release, base, environment):
     base.mkdir()
     seed_env = dict(environment, PYTHONPATH=str(release / "app_packages"))
-    subprocess.run(
+    status = wait_for_process(
         [release / "python/bin/python3", "-c", SEED_PROFILE, base, PROFILE],
-        check=True, env=seed_env,
+        timeout=30, env=seed_env,
     )
+    if status:
+        raise RuntimeError(f"Anki profile setup exited with status {status}")
 
 
 def stage_media(media, environment):
@@ -66,10 +85,25 @@ def stage_media(media, environment):
         raise ValueError("The guide's static SVG Node example is missing")
     # Resolve the package from its built directory, then write the sample into the test profile.
     script = f"process.chdir({json.dumps(str(media))});\n" + example[1]
-    subprocess.run(
+    status = wait_for_process(
         ["node", "--input-type=module", "-e", script],
-        check=True, cwd=PACKAGE, env=environment,
+        timeout=30, cwd=PACKAGE, env=environment,
     )
+    if status:
+        raise RuntimeError(f"Static SVG generation exited with status {status}")
+
+
+def read_events(evidence):
+    events = []
+    for index, line in enumerate(evidence.splitlines(), start=1):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Invalid Anki report JSON on line {index}: {error.msg}") from error
+        if not isinstance(event, dict) or not isinstance(event.get("step"), str):
+            raise ValueError(f"Missing Anki report step on line {index}")
+        events.append(event)
+    return events
 
 
 def run(executable, report):
@@ -97,34 +131,49 @@ def run(executable, report):
         desktop_env["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
         log = root / "anki.log"
         problem = None
-        with log.open("w", encoding="utf-8") as output, subprocess.Popen(
-            ["unshare", "--map-root-user", "--net", "sh", "-ec", OFFLINE, "anki-offline",
-             str(executable), "-b", str(base), "-p", PROFILE, "-l", "en"],
-            env=desktop_env, stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
-        ) as desktop:
+        with log.open("w", encoding="utf-8") as output:
             try:
-                status = desktop.wait(timeout=90)
+                status = wait_for_process(
+                    ["unshare", "--map-root-user", "--net", "sh", "-ec", OFFLINE, "anki-offline",
+                     str(executable), "-b", str(base), "-p", PROFILE, "-l", "en"],
+                    timeout=90, env=desktop_env, stdout=output, stderr=subprocess.STDOUT,
+                )
                 if status:
                     problem = f"Anki exited with status {status}"
             except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(desktop.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
                 problem = "Anki timed out after 90 seconds"
 
         evidence = results.read_text(encoding="utf-8") if results.exists() else ""
+        report_error = None
         if report is not None and evidence:
-            report.write_text(evidence, encoding="utf-8")
-        events = [json.loads(line) for line in evidence.splitlines()]
-        for event in events:
+            try:
+                report.write_text(evidence, encoding="utf-8")
+            except OSError as error:
+                report_error = f"Could not save the Anki report: {error}"
+        try:
+            events = read_events(evidence)
+        except ValueError as error:
+            events = []
+            print(error, file=sys.stderr)
+            problem = problem or "The Anki report was invalid"
+        for event in (event for event in events if event["step"] != "PASS"):
             details = event.get("app") or event.get("userAgent")
-            print(" ".join((event["step"], details)) if details else event["step"], flush=True)
-        if problem or not events or events[-1]["step"] != "PASS":
+            print(f"{event['step']} {details}" if details else event["step"], flush=True)
+        if problem or not events or events[-1]["step"] != "PASS" or any(e["step"] == "FAIL" for e in events):
             print(log.read_text(encoding="utf-8"), file=sys.stderr)
             if events:
-                print(json.dumps(events[-1], indent=2), file=sys.stderr)
+                failed = next((event for event in events if event["step"] == "FAIL"), events[-1])
+                print(json.dumps(failed, indent=2), file=sys.stderr)
+            if report_error:
+                print(report_error, file=sys.stderr)
             raise RuntimeError(problem or "The clean-profile checklist did not pass")
+        if report_error:
+            raise RuntimeError(report_error)
+        print("PASS", flush=True)
+
+
+def on_sigterm(signum, _frame):
+    raise SystemExit(128 + signum)
 
 
 def main():
@@ -144,9 +193,12 @@ def main():
         parser.error("--anki must point to an official extracted Linux release with bundled Python")
     if not (PACKAGE / "dist" / BUNDLE).is_file():
         parser.error("run npm run build from packages/keyboard first")
+    signal.signal(signal.SIGTERM, on_sigterm)
     try:
         run(executable, args.report)
-    except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
+    except KeyboardInterrupt:
+        parser.exit(130, "Anki test interrupted\n")
+    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f"{error}\n")
 
 
