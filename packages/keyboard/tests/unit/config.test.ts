@@ -6,6 +6,7 @@ import { minimalAppearance } from '../../src/skins/appearance.js';
 describe('configuration normalization', () => {
   it('resolves the approved core defaults', () => {
     expect(normalizeConfig()).toEqual({
+      accessibility: {},
       labels: { mode: 'none', emphasizeC: false, custom: new Map() },
       highlights: new Map(),
       pressedMode: 'both',

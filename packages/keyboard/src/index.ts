@@ -7,3 +7,4 @@ export type { Orientation } from './config/normalize.js';
 export type { AnimationEasing, AnimationOptions } from './config/animation.js';
 export type { AppearanceColor, AppearanceOptions, BuiltInSkin, GradientStop, KeyGradient, KeyPaint } from './skins/appearance.js';
 export type { IndicatorOptions, KeyOverlay, KeyOverlays, LabelMode, LabelOptions, NoteMap, PressedMode } from './config/decorations.js';
+export type { AccessibilityOptions } from './config/accessibility.js';

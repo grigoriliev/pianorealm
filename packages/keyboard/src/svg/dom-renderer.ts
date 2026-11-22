@@ -3,7 +3,7 @@ import type { KeyboardScene, KeyPresentation, SceneKey } from '../scene/build-sc
 import { decorationLayers } from '../scene/key-decorations.js';
 import type { DecorationLayer } from '../scene/key-decorations.js';
 import {
-  backgroundAttributes, describeDecorationLayer, describeIndicator, fillAttribute, keyAttributes, keyStyleAttributes,
+  accessibilityAttributes, accessibilityAttributeNames, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, fillAttribute, keyAttributes, keyStyleAttributes,
   rootAttributes, SVG_NS, viewportAttributes,
 } from './attributes.js';
 import type { Viewport } from './attributes.js';
@@ -63,8 +63,26 @@ export function buildSvg(document: Document, scene: KeyboardScene, prefix: strin
   }
   for (const { indicator } of keys.values()) root.appendChild(indicator);
   const drawing = { root, keys, background, defs, definitions: scene.definitions, layers: new Map<DecorationLayer, DecorationNodes>() };
+  updateAccessibility(root, scene, prefix);
   updateDecorations(drawing, scene, prefix);
   return drawing;
+}
+
+function updateAccessibility(root: SVGSVGElement, scene: KeyboardScene, prefix: string): void {
+  const attributes = accessibilityAttributes(scene, prefix);
+  for (const name of accessibilityAttributeNames) {
+    if (Object.hasOwn(attributes, name)) setAttribute(root, name, attributes[name]);
+    else if (root.hasAttribute(name)) root.removeAttribute(name);
+  }
+
+  const current = root.firstElementChild;
+  const description = describeAccessibility(scene, prefix);
+  if (current?.localName === 'desc') {
+    if (!description) current.remove();
+    else if (current.textContent !== description.text) current.textContent = description.text ?? '';
+  } else if (description) {
+    root.prepend(materialize(root.ownerDocument, description));
+  }
 }
 
 function sameNode(a: SvgNode, b: SvgNode): boolean {
@@ -137,7 +155,7 @@ export function updateSvg(
   } else {
     setAttribute(drawing.background, 'fill', scene.background);
   }
-  setAttribute(drawing.root, 'aria-label', scene.label);
+  updateAccessibility(drawing.root, scene, prefix);
   for (const key of scene.keys) {
     const nodes = drawing.keys.get(key.note)!;
     applyAttributes(nodes.body, geometryChanged ? keyAttributes(key, prefix) : keyStyleAttributes(key, prefix));

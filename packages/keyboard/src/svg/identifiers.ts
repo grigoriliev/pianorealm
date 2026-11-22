@@ -1,7 +1,9 @@
 import type { DefinitionSlot } from '../scene/build-scene.js';
 
 const documentAllocator = Symbol.for('@pianorealm/keyboard/svg-identifiers');
-const slots: readonly DefinitionSlot[] = [
+type IdSlot = DefinitionSlot | 'description';
+const slots: readonly IdSlot[] = [
+  'description',
   'white-gradient', 'black-gradient', 'black-shadow',
   ...Array.from({ length: 128 }, (_, note): DefinitionSlot => `key-clip-${note}`),
 ];
@@ -43,7 +45,7 @@ export function staticPrefix(prefix: string | undefined): string {
   return prefix;
 }
 
-export function definitionId(prefix: string, slot: DefinitionSlot): string {
+export function definitionId(prefix: string, slot: IdSlot): string {
   return `${prefix}-${slot}`;
 }
 

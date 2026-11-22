@@ -44,7 +44,7 @@ export function resolveAnimation(skin: string, options: AnimationOptions): Resol
   const classic = skin === 'classic';
   return Object.freeze({
     enabled: options.enabled ?? true,
-    duration: options.duration ?? (classic ? 160 : 120),
+    duration: options.duration ?? (classic ? 160 : skin === 'modern' ? 150 : 120),
     easing: options.easing ?? (classic ? 'ease-in-out' : 'ease-out'),
   });
 }

@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 8 · **Phase 9:** In progress, Anki Desktop Linux verified
+> **Status:** Phase 10 complete, release approval pending · **Last completed phase:** Phase 10
 > **Last verified:** 2026-11-22 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
@@ -11,6 +11,32 @@
 - Internal configuration returns a frozen snapshot after validation. A patch replaces the range as a pair, merges declared notation and sizing fields, and uses explicit `undefined` to reset values. Patched notation applies to new range names. Existing MIDI endpoints retain their identity. Dimensions live under sizing. Defaults are horizontal, MIDI 21–108, container sizing, and white/black pitch widths and depths of 20 × 100 and 12 × 60. [Note and configuration ADR](docs/decisions/0001-notes-configuration-and-state.md) · [Layout and sizing ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
+
+## Phase 10 handoff
+
+- `src/skins/appearance.ts` adds Modern, Neon, Dark and High Contrast through the existing token pipeline, expanding `BuiltInSkin`. Modern has a 150 ms default transition. Neon uses a vivid fill in the default palette.
+- `src/config/accessibility.ts`, the shared scene and both SVG adapters add the optional `AccessibilityOptions` record for labels, scoped literal descriptions and decorative mode. Defaults preserve the existing image name and display semantics. Existing state, geometry, event and lifecycle contracts still apply.
+- `demo/` extends the existing demo with layout, sizing, selection, appearance, and motion controls. The preview produces mounted and static JavaScript snippets and exports the final scene through the public static API.
+- The manifest limits the archive to production artifacts, the license, user-facing guides and changelog. The packed consumer compiles the README TypeScript example and renders in Node with browser globals blocked. The package remains private at `0.0.0`.
+- The release audit checks every criterion in the specification and development plan, with default-palette contrast measurements, reproducible visual checks and a proposed version. [Release audit](docs/RELEASE_READINESS.md)
+
+### Verification
+
+Commands ran from `packages/keyboard` on Debian 13.8 x86-64 with Node 24.22.1, npm 11.19.1, TypeScript 5.9.3, Vite 7.3.8, Vitest 4.1.12 and Python 3.13.5.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build && npm run test:artifacts` before Phase 10 edits | Passed. 263 tests in eight files, all three bundles and declarations, and 15 built-artifact checks. |
+| `npm run typecheck && npm test && npm run build` | Passed. 270 tests in eight files. ESM, both classic scripts, sourcemaps and declarations emitted. |
+| `npm run test:artifacts` | Passed all 15 checks. Installed a locally packed tarball offline, compiled the TypeScript consumer and README example, and verified DOM-free static output and classic-script load policies. |
+| `npm pack --dry-run --json --offline --ignore-scripts --cache /tmp/pianorealm-phase10-pack/cache` | Inspected the package allowlist. The final artifact suite also checks the actual packed file list. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 -B tests/artifacts/firefox-release.py --output /tmp/pianorealm-phase10-visual` | Passed on Firefox 160.0.1. Both screenshots matched their reviewed baselines. Firefox verified computed roles and names, SVG descriptions, transformed hit tests and the playground controls, validation, generated static example and SVG download payloads. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 -B tests/artifacts/firefox-offline.py` | Both classic bundles passed in Firefox 160.0.1. Verified offline local media, reduced motion, fallback resizing, multiple instances, repeated mounting and static SVG rasterization. |
+| `python3 -B -m unittest discover -s tests/anki` | Passed four runner tests. |
+| `python3 tests/anki/run.py --anki /tmp/pianorealm-anki26/anki-26.9.3-linux-x86_64.tar/anki --report /tmp/pianorealm-phase10-anki.jsonl` | Passed on Anki Desktop 26.09.3, QtWebEngine 6.11.2 / Chromium 140. The clean-profile run checked card setup, review, remount, night mode, narrow sizing, scriptless rendering and diagnostics. |
+| `cmp LICENSE ../../LICENSE` and `git diff --check` | Passed. The package license matches the root license. The pre-existing untracked package `.gitignore` was preserved. |
+
+The sandbox restricted nested npm processes, Firefox loopback, and Anki's network namespace. The passing runs used the required local permissions. Screen readers, OS forced colors, browser engines outside the Firefox and Anki fixtures, Node 22 tooling, other Anki clients, and media sync remain unverified.
 
 ## Phase 9 handoff
 
@@ -43,7 +69,7 @@ On 2026-11-22, the official Anki Desktop 26.09.3 client passed the checklist on 
 
 The clean-profile developer walkthrough also passed on the same Desktop client. `npm ci && npm run build` succeeded in a disposable checkout with Node 24.22.1 and npm 11.19.1. After copying the generated media, `TMPDIR=/tmp/pianorealm-anki26/guide-check-tmp unshare --map-root-user --net /tmp/pianorealm-anki26/run-guide-check.sh` exited 0. Automation used the real Manage Note Types, Fields, Cards, and Add windows in an initially empty collection. Each sample note generated one card with the Back field empty. Review, the scriptless image question and text answer, inline SVG, and the customization example with note labels and three square markers all passed. With the template-only bundle deliberately removed, Check Media still reported no missing files and the preview showed the helper's missing-bundle message. The temporary run log at `/tmp/pianorealm-anki26/guide-check-report.jsonl` ended in `PASS`.
 
-Media sync and other Anki clients, versions, and platforms remain unverified. Assistive technologies and the Node 22 development baseline remain untested in this phase. Phase 9 stays in progress for the remaining client coverage. [Compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
+Media sync and other Anki clients, versions, and platforms remain unverified. Assistive technologies and the Node 22 development baseline remain untested in this phase. On 2026-11-22 the project owner accepted the verified Anki Desktop Linux coverage as sufficient for Phase 9. Windows and macOS Desktop, AnkiDroid, AnkiMobile, AnkiWeb, and media sync remain untested. [Compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
 
 The clean-profile walkthrough is reproducible from `tests/anki/`. From `packages/keyboard`, `npm run build && python3 tests/anki/run.py --anki /tmp/pianorealm-anki26/anki-26.9.3-linux-x86_64.tar/anki --report /tmp/pianorealm-repo-anki-results.jsonl` exited 0. The repository runner created its own temporary profile, used the guide's examples, and reported `PASS` on the same Anki Desktop and WebView versions. [Runner prerequisites and commands](docs/guides/anki-integration.md#run-the-clean-profile-desktop-test)
 
@@ -178,7 +204,7 @@ Keep the working tree when resuming. The new Phase 5 files are `src/skins/appear
 | Geometry, MIDI identity and logical state continuity | Mount tests compare node identities, bounds and MIDI order through repeated skin switches, verify off-range note retention, and assert writes only to the affected key fill and dot during a state-only update. |
 | Shared SVG, isolated definitions and cleanup | Parsed Classic SVG matches the mounted drawing after prefix normalization in both orientations. Tests cover host ID collisions, separate module copies, repeatable explicit static prefixes, definition removal, and observer cleanup. Firefox verifies gradient and shadow pixels and byte-identical downloads. |
 | Atomic updates and compatibility | Rejected mixed patches produce zero observed DOM mutations. Tests cover observer setup rollback, and package checks preserve existing APIs and build declarations. |
-| Phase boundaries and handoff | Phase 10 still tracks the remaining skins and contrast strategy. The Phase 5 handoff identified Phase 6 as the next milestone. |
+| Phase boundaries and handoff | Phase 5 assigned the remaining skins and contrast strategy to Phase 10. The Phase 5 handoff identified Phase 6 as the next milestone. |
 
 ### Verification
 
@@ -336,8 +362,8 @@ From the repository root, `git diff --check` passed and `git status --short --un
 - Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
 - Firefox 160.0.1 was the only real browser checked for Phases 5 and 6. The Phase 6 smoke adds browser evidence for mode switching. Observer setup rollback is covered by DOM integration tests. Other browsers, assistive technologies and Anki clients remain unverified.
 - Classic gradient-to-solid changes apply immediately. Hosts without ResizeObserver need explicit `resize()` after layout changes. Hosts without the reduced-motion CSS feature show the stable final state.
-- Anki Desktop Linux has one verified client version. The remaining client matrix is Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS, optional public key bounds, and registration of custom overlay types remain deferred.
+- Anki Desktop Linux has one verified client version. Additional clients and media sync remain unverified. CommonJS, optional public key bounds, and registration of custom overlay types remain deferred under the existing API scope.
 
 ## Next task
 
-Repeat the checklist in an available Windows or macOS Anki Desktop test profile, then extend the matrix to mobile and AnkiWeb as environments become available. [Anki test checklist](docs/guides/anki-integration.md#test-on-each-client)
+Review the proposed `1.0.0` version and release metadata. With approval, build the candidate from an identified source revision and rerun the release checklist. Repeat the Anki checklist on additional clients as environments become available. [Anki test checklist](docs/guides/anki-integration.md#test-on-each-client)

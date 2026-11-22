@@ -26,8 +26,6 @@ export interface AppearanceOptions {
   readonly blackKeyShadow?: number | undefined;
 }
 
-export type BuiltInSkin = 'minimal' | 'classic';
-
 export type ResolvedAppearance = {
   readonly [Field in keyof AppearanceOptions]-?: NonNullable<AppearanceOptions[Field]>;
 };
@@ -53,10 +51,31 @@ const classic = normalizeAppearance({
   blackKeyShadow: 0.28,
 });
 
+const builtInSkins = {
+  minimal: minimalAppearance,
+  classic,
+  modern: normalizeAppearance({
+    background: '#cbd5df', white: '#f4f8fc', black: '#203143', boundary: '#536577',
+    cornerRadius: 2.5, blackKeyShadow: 0.18, pressed: '#306997',
+  }),
+  neon: normalizeAppearance({
+    background: '#121527', white: '#b4c0e0', black: '#292844', boundary: '#6e79a6',
+    cornerRadius: 1, pressed: '#9b226d',
+  }),
+  dark: normalizeAppearance({
+    background: '#16191d', white: '#b9c0c6', black: '#2c3036', boundary: '#505962',
+    pressed: '#275968',
+  }),
+  'high-contrast': normalizeAppearance({
+    background: '#000000', white: '#ffffff', black: '#000000', boundary: '#737373',
+    pressed: '#005a85',
+  }),
+} satisfies Record<string, AppearanceOptions>;
+
+export type BuiltInSkin = keyof typeof builtInSkins;
+
 export function findSkin(name: string, customSkins?: ReadonlyMap<string, AppearanceOptions>): AppearanceOptions | undefined {
-  if (name === 'minimal') return minimalAppearance;
-  if (name === 'classic') return classic;
-  return customSkins?.get(name);
+  return Object.hasOwn(builtInSkins, name) ? builtInSkins[name as BuiltInSkin] : customSkins?.get(name);
 }
 
 export function validateColor(value: unknown, field: string): AppearanceColor {

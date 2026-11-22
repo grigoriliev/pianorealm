@@ -1,7 +1,7 @@
 import { clipSlot } from '../scene/key-decorations.js';
 import type { DecorationLayer } from '../scene/key-decorations.js';
-import type { SvgNode } from './node.js';
-import { definitionReference } from './identifiers.js';
+import type { SvgAttributes, SvgNode } from './node.js';
+import { definitionId, definitionReference } from './identifiers.js';
 import type { KeyboardScene, KeyPresentation, SceneKey } from '../scene/build-scene.js';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -33,9 +33,22 @@ export function rootAttributes(scene: KeyboardScene) {
     preserveAspectRatio: 'xMidYMid meet',
     display: 'block',
     overflow: 'hidden',
-    role: 'img',
-    'aria-label': scene.label,
   };
+}
+
+export function accessibilityAttributes(scene: KeyboardScene, prefix: string): SvgAttributes {
+  if (scene.decorative) return { 'aria-hidden': 'true' };
+  return {
+    role: 'img', 'aria-label': scene.label,
+    ...(scene.description === undefined ? {} : { 'aria-describedby': definitionId(prefix, 'description') }),
+  };
+}
+
+export const accessibilityAttributeNames = ['role', 'aria-label', 'aria-describedby', 'aria-hidden'] as const;
+
+export function describeAccessibility(scene: KeyboardScene, prefix: string): SvgNode | undefined {
+  if (scene.decorative || scene.description === undefined) return;
+  return { name: 'desc', attributes: { id: definitionId(prefix, 'description') }, text: scene.description };
 }
 
 export function backgroundAttributes(scene: KeyboardScene) {

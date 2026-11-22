@@ -24,6 +24,8 @@ export interface KeyboardScene {
   readonly width: number;
   readonly height: number;
   readonly label: string;
+  readonly description: string | undefined;
+  readonly decorative: boolean;
   readonly background: string;
   readonly definitions: readonly SceneDefinition[];
   readonly appearance: ResolvedAppearance;
@@ -104,7 +106,9 @@ export function buildScene(
   return Object.freeze({
     width: layout.width,
     height: layout.height,
-    label: `${horizontal ? 'Horizontal' : 'Vertical'} piano keyboard, ${notes}`,
+    label: config.accessibility.label ?? `${horizontal ? 'Horizontal' : 'Vertical'} piano keyboard, ${notes}`,
+    description: config.accessibility.description,
+    decorative: config.accessibility.decorative ?? false,
     background: appearance.background,
     appearance,
     pressedMode: config.pressedMode,

@@ -268,7 +268,7 @@ export class PianoKeyboard {
     const changesViewport = sizing.mode !== oldSizing.mode || sizing.width !== oldSizing.width
       || sizing.height !== oldSizing.height;
     const changesPresentation = notation !== previous.notation || appearance !== previous.appearance
-      || config.pressedMode !== previous.pressedMode || config.indicator !== previous.indicator
+      || config.accessibility !== previous.accessibility || config.pressedMode !== previous.pressedMode || config.indicator !== previous.indicator
       || config.labels !== previous.labels || config.highlights !== previous.highlights || config.overlays !== previous.overlays;
     const layout = changesLayout ? layoutFor(config) : this.#layout;
     const scene = changesLayout || changesPresentation ? buildScene(config, layout, appearance, this.#pressed) : undefined;

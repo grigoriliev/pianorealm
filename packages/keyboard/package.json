@@ -4,6 +4,13 @@
   "private": true,
   "description": "Framework-independent SVG piano keyboard visualization",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grigoriliev/pianorealm.git",
+    "directory": "packages/keyboard"
+  },
+  "keywords": ["piano", "keyboard", "svg", "anki", "visualization"],
+  "files": ["dist/", "docs/guides/", "CHANGELOG.md"],
   "type": "module",
   "engines": {
     "node": "^22.12.0 || ^24.0.0"

@@ -1431,3 +1431,96 @@ describe('visualization extensions', () => {
     replacement.destroy();
   });
 });
+
+function contrastRatio(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const rgb = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255)
+      .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  };
+  const values = [luminance(a) + 0.05, luminance(b) + 0.05];
+  return Math.max(...values) / Math.min(...values);
+}
+
+describe('release appearance and accessibility', () => {
+  it.each(['minimal', 'classic', 'modern', 'neon', 'dark', 'high-contrast'] as const)(
+    'keeps both renderers in parity for %s in both orientations and every pressed mode',
+    skin => {
+      const options = {
+        range: { from: 'F#3', to: 'D#4' },
+        sizing: { mode: 'fixed', width: 120, height: 95 },
+        labels: { mode: 'note' },
+        highlights: { C4: '#fea' },
+        overlays: { C4: [{ type: 'text', text: 'Do' }, { type: 'circle' }] },
+      } as const;
+      const piano = mount(options);
+      piano.setPressedKeys(['F#3', 'C4']);
+      const root = svg();
+      const body = root.querySelector('[data-note="60"]');
+      piano.setSkin(skin);
+      expect(root.querySelector('[data-note="60"]')).toBe(body);
+      expect(piano.getPressedKeys()).toEqual([54, 60]);
+      expect(() => piano.registerSkin(skin, {})).toThrow(/already registered/);
+      const colors = (note: number) => {
+        const fill = root.querySelector(`[data-note="${note}"]`)!.getAttribute('fill')!;
+        const gradient = /^url\(#(.+)\)$/.exec(fill);
+        return gradient
+          ? Array.from(root.querySelectorAll(`[id="${gradient[1]}"] stop`), stop => stop.getAttribute('stop-color')!)
+          : [fill];
+      };
+      for (const color of colors(55)) expect(contrastRatio('#151515', color)).toBeGreaterThanOrEqual(4.5);
+      for (const color of colors(56)) expect(contrastRatio('#ffffff', color)).toBeGreaterThanOrEqual(4.5);
+      for (const color of colors(60)) expect(contrastRatio('#ffffff', color)).toBeGreaterThanOrEqual(4.5);
+      for (const orientation of ['horizontal', 'vertical'] as const) {
+        piano.setOrientation(orientation);
+        for (const pressedMode of ['both', 'indicator', 'color'] as const) {
+          piano.setOptions({ pressedMode });
+          const liveRoot = svg();
+          const prefix = liveRoot.getAttribute('data-pianorealm-motion')!;
+          const liveMarkup = liveRoot.outerHTML
+            .replace(/ data-pianorealm-motion="[^"]*"/, '')
+            .replaceAll(prefix + '-', 'test-');
+          const staticSvg = PianoKeyboard.renderToSVG({
+            ...options, skin, orientation, pressedMode, idPrefix: 'test', pressedKeys: ['F#3', 'C4'],
+          });
+          const parser = new dom.window.DOMParser();
+          const toXml = (markup: string) => parser.parseFromString(markup, 'image/svg+xml').documentElement;
+          const expected = toXml(staticSvg);
+          const live = toXml(liveMarkup.replace('<svg ', `<svg xmlns="${SVG_NS}" `));
+          expect(live.isEqualNode(expected)).toBe(true);
+          expect(liveRoot.querySelectorAll('[data-pressed-indicator][display="inline"]')).toHaveLength(
+            pressedMode === 'color' ? 0 : 2,
+          );
+        }
+      }
+    },
+  );
+
+  it('uses scoped literal descriptions and supports reversible decorative mode', () => {
+    const text = 'C & E <G>';
+    const options = { sizing: { mode: 'fixed' }, accessibility: { label: 'Chord', description: text } } as const;
+    const piano = mount(options);
+    mount(options, dom.window.document.getElementById('other')!);
+    const root = svg();
+    const desc = root.querySelector('desc')!;
+    expect(desc.textContent).toBe(text);
+    expect(root.getAttribute('aria-describedby')).toBe(desc.id);
+    expect(svg(dom.window.document.getElementById('other')!).querySelector('desc')!.id).not.toBe(desc.id);
+
+    const output = PianoKeyboard.renderToSVG({ ...options, idPrefix: 'chord' });
+    expect(output).toContain('aria-describedby="chord-description"');
+    expect(output).toContain('<desc id="chord-description">C &amp; E &lt;G&gt;</desc>');
+    expect(() => piano.setOptions({ accessibility: { label: 'Changed', description: '\u0000' } })).toThrow(/XML/);
+    expect(root.getAttribute('aria-label')).toBe('Chord');
+
+    piano.setOptions({ accessibility: { decorative: true } });
+    expect(root.getAttribute('aria-hidden')).toBe('true');
+    expect(root.hasAttribute('role')).toBe(false);
+    expect(root.hasAttribute('aria-describedby')).toBe(false);
+    expect(root.querySelector('desc')).toBeNull();
+    expect(PianoKeyboard.renderToSVG({ accessibility: { decorative: true, description: text } })).not.toContain('<desc');
+    piano.setOptions({ accessibility: { decorative: false, label: undefined } });
+    expect(root.getAttribute('aria-label')).toBe('Horizontal piano keyboard, A0 to C8');
+    expect(root.querySelector('desc')!.id).toBe(desc.id);
+  });
+});

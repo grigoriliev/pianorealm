@@ -290,7 +290,7 @@ Decorations use intrinsic coordinates. Position fractions run along pitch, from 
 
 Skin objects **only** describe resolved appearance: backgrounds, key fills, borders, radii, shadow/gradient treatments, label colors, active-state visuals, indicator styles, and animation defaults. A skin **MUST NOT** change pitch order, MIDI numbers, state semantics, event delivery, or input behavior.
 
-Phase 5 provides `minimal` and `classic`. `registerSkin(name, appearance)` validates and copies tokens into the keyboard instance, where `setSkin(name)` can select them. Phase 10 tracks `modern`, `neon`, `dark` and a high-contrast skin or equivalent accessibility mode. [Supported appearance tokens](README.md#skins-and-appearance)
+The built-in skins are `minimal`, `classic`, `modern`, `neon`, `dark`, and `high-contrast`. `registerSkin(name, appearance)` validates and copies tokens into the keyboard instance, where `setSkin(name)` can select them. [Supported appearance tokens](README.md#skins-and-appearance)
 
 Resolution applies Minimal defaults, selected skin tokens and explicit instance overrides in that order. The accepted policy places explicit accessibility settings last when they are introduced. Key dimensions belong to sizing options. [Configuration ADR](docs/decisions/0001-notes-configuration-and-state.md)
 
@@ -360,7 +360,7 @@ The mounted adapter owns an instance-scoped CSS stylesheet for transitions. It e
 
 ## 13. Accessibility and security
 
-- Give the root SVG an appropriate accessible name/description or a documented decorative mode; avoid misleading button semantics for a display-only component.
+- Give the SVG one image role and an accessible name unless `accessibility.decorative` marks it hidden. The optional literal description uses an instance-scoped `desc` ID through `aria-describedby`.
 - Support legible labels, high contrast, and non-color-only indicators; test compact and vertical views.
 - Avoid unintended tab stops and keyboard handling in the base package; future interaction accessibility belongs to an optional integration.
 - Escape labels, annotations, text overlays, CSS values, and attributes as appropriate. For custom SVG elements, prefer a validated declarative shape schema rather than raw HTML/SVG markup; never treat arbitrary supplied strings as trusted XML.

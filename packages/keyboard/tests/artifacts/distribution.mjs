@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { after, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createContext, Script } from 'node:vm';
@@ -9,6 +11,7 @@ import { JSDOM } from 'jsdom';
 import ts from 'typescript';
 import { PianoKeyboard } from '@pianorealm/keyboard';
 
+const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const dist = join(root, 'dist');
 const manifest = readFileSync(join(root, 'package.json'));
@@ -16,25 +19,52 @@ const { version } = JSON.parse(manifest);
 const buildMarker = Symbol.for('@pianorealm/keyboard/standalone-version');
 const render = PianoKeyboard.renderToSVG;
 
-test('built ESM and declarations work for an external consumer without DOM or source files', async () => {
+test('packed ESM and declarations work for an external consumer without DOM or source files', async () => {
   const consumer = mkdtempSync(join(tmpdir(), 'pianorealm-consumer-'));
   const browserGlobals = ['window', 'document', 'HTMLElement', 'DOMParser', 'ResizeObserver'];
   try {
-    const dependency = join(consumer, 'node_modules/@pianorealm/keyboard');
-    mkdirSync(dependency, { recursive: true });
-    writeFileSync(join(dependency, 'package.json'), manifest);
-    cpSync(dist, join(dependency, 'dist'), { recursive: true });
+    const npm = async (args, cwd) => {
+      const flags = ['--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--cache', join(consumer, 'cache')];
+      const command = process.env.npm_execpath ? process.execPath : 'npm';
+      const { stdout } = await execute(command, [...(process.env.npm_execpath ? [process.env.npm_execpath] : []), ...args, ...flags], {
+        cwd, encoding: 'utf8',
+      });
+      return stdout;
+    };
+    const [pack] = JSON.parse(await npm(['pack', '--json', '--pack-destination', consumer], root));
+    const packed = pack.files.map(file => file.path);
+    assert.ok(packed.every(path => path.startsWith('dist/') || path.startsWith('docs/guides/')
+      || ['README.md', 'CHANGELOG.md', 'LICENSE', 'package.json'].includes(path)));
+    for (const path of ['LICENSE', 'README.md', 'CHANGELOG.md', 'docs/guides/anki-integration.md',
+      'docs/guides/_pianorealm-anki-card.js', 'dist/index.d.ts']) {
+      assert.ok(packed.includes(path), path);
+    }
+    for (const name of ['pianorealm-keyboard.esm.js', 'pianorealm-keyboard.umd.js', 'pianorealm-keyboard.umd.min.js']) {
+      assert.ok(packed.includes('dist/' + name));
+      assert.ok(packed.includes('dist/' + name + '.map'));
+      const sourceMap = JSON.parse(readFileSync(join(dist, name + '.map'), 'utf8'));
+      assert.ok(sourceMap.sources.every(source => /^\.\.\/src\//.test(source)), name);
+    }
+    writeFileSync(join(consumer, 'package.json'), '{"private":true}');
+    await npm(['install', join(consumer, pack.filename)], consumer);
     const fixture = join(consumer, 'consumer.mts');
     cpSync(join(root, 'tests/artifacts/consumer.mts'), fixture);
-    const program = ts.createProgram([fixture], {
-      strict: true, exactOptionalPropertyTypes: true, types: [],
-      target: ts.ScriptTarget.ES2022, lib: ['lib.es2022.d.ts'], module: ts.ModuleKind.NodeNext,
-    });
-    const diagnostics = ts.getPreEmitDiagnostics(program);
-    assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
-      getCanonicalFileName: name => name, getCurrentDirectory: () => consumer, getNewLine: () => '\n',
-    }));
-    assert.equal(program.emit().emitSkipped, false);
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const quickStart = join(consumer, 'quick-start.mts');
+    const example = /## Install from a local build[\s\S]*?```ts\n([\s\S]*?)```/.exec(readme)?.[1];
+    assert.ok(example, 'README TypeScript quick start');
+    writeFileSync(quickStart, example);
+    for (const [source, libs] of [[fixture, ['lib.es2022.d.ts']], [quickStart, ['lib.es2022.d.ts', 'lib.dom.d.ts']]]) {
+      const program = ts.createProgram([source], {
+        strict: true, exactOptionalPropertyTypes: true, types: [],
+        target: ts.ScriptTarget.ES2022, lib: libs, module: ts.ModuleKind.NodeNext,
+      });
+      const diagnostics = ts.getPreEmitDiagnostics(program);
+      assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+        getCanonicalFileName: name => name, getCurrentDirectory: () => consumer, getNewLine: () => '\n',
+      }));
+      assert.equal(program.emit().emitSkipped, false);
+    }
     for (const name of browserGlobals) {
       assert.ok(!Object.hasOwn(globalThis, name));
       Object.defineProperty(globalThis, name, { configurable: true, get() { assert.fail('Accessed ' + name); } });

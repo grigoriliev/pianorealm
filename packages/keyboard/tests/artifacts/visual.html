@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:">
+<title>Keyboard visual regression</title>
+<style>
+  * { box-sizing: border-box; }
+  html { background: #e9edf3; color: #142233; font: 14px "DejaVu Sans", sans-serif; }
+  body { margin: 0; padding: 12px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 296px), 1fr)); gap: 8px; }
+  section { background: #fff; border: 1px solid #adb7c8; padding: 8px; min-width: 0; }
+  section:last-child { grid-column: 1 / -1; }
+  h2 { margin: 0 0 6px; font-size: 14px; }
+  .pair { display: flex; gap: 8px; align-items: center; }
+  .compact .mounted, .compact img { width: 128px; height: 98px; }
+  .full .mounted { width: 100%; height: 82px; }
+  .full img { display: none; }
+</style>
+<h1>Mounted and static SVG</h1>
+<main></main>
+<script src="pianorealm-keyboard.umd.min.js"></script>
+<script src="visual.js"></script>
+</html>

@@ -5,13 +5,13 @@
 Pianorealm is an open-source, framework-independent JavaScript and TypeScript ecosystem for piano visualization, interaction, MIDI connectivity, and audio. Its goal is to let developers combine only the capabilities they need—from a static keyboard diagram in a flashcard to a playable, MIDI-connected application.
 
 > [!IMPORTANT]
-> **Early development.** The keyboard package has a local ESM build with note utilities, a mounted Minimal SVG keyboard, and programmatic pressed-key highlights. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
+> **Early development.** The keyboard visualization package builds locally with ESM, static SVG generation, and offline classic-script bundles. Consult the [keyboard project state](packages/keyboard/PROJECT_STATE.md) for verified progress.
 
 ## Packages
 
 | Package | Responsibility | Status |
 | --- | --- | --- |
-| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | Phase 4 complete. Programmatic pressed-key state, mounted SVG in both orientations, configurable range, viewport fitting, and a private static SVG prototype. |
+| **`@pianorealm/keyboard`** | SVG piano keyboard visualization, layout, visual note state, themes, labels, overlays, and static SVG output | Release preparation. [Package documentation](packages/keyboard/README.md). |
 | **`@pianorealm/interaction`** | Pointer, mouse, touch, and computer-keyboard input | Planned |
 | **`@pianorealm/midi`** | MIDI input/output and device integration | Planned |
 | **`@pianorealm/audio`** | Audio generation and playback | Planned |
@@ -32,7 +32,7 @@ For example, `@pianorealm/keyboard` is intended to render a note as visually pre
 
 ## First milestone: `@pianorealm/keyboard`
 
-The first package is a reusable, display-only piano keyboard visualization component. Its planned capabilities include:
+The first package is a reusable, display-only piano keyboard visualization component. Its capabilities include:
 
 - Horizontal and vertical keyboard layouts with configurable MIDI note ranges.
 - Accurate white/black-key geometry, including partial octaves and black-key endpoints.
@@ -42,15 +42,11 @@ The first package is a reusable, display-only piano keyboard visualization compo
 - Self-contained static SVG generation and offline/embedded use, including Anki integration.
 - Public integration points that allow future input libraries to work without relying on private SVG internals.
 
-These are **requirements and goals**, not a claim that the features are implemented today.
-
 See the [keyboard specification](packages/keyboard/PROJECT_SPEC.md), [package architecture](packages/keyboard/ARCHITECTURE.md), and [development plan](packages/keyboard/DEVELOPMENT_PLAN.md) for details.
 
 ## Project status and roadmap
 
 The [keyboard project state](packages/keyboard/PROJECT_STATE.md) is the authoritative record of what has actually been completed and verified.
-
-Phase 4 delivered programmatic pressed-key visualization. Phase 5 covers skins and configurable appearance.
 
 Development is organized into reviewable phases covering tooling, geometry, SVG rendering, visual state, appearance, responsive behavior, overlays, extension points, static/embedded builds, and release quality.
 

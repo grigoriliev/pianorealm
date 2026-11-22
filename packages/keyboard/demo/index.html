@@ -3,60 +3,105 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Keyboard rendering demo</title>
+    <title>Keyboard playground</title>
     <link rel="stylesheet" href="./demo.css">
     <script type="module" src="./main.ts"></script>
   </head>
   <body>
     <main>
-      <h1>Keyboard rendering demo</h1>
-      <p>
-        <button type="button" id="highlight-chord">Highlight C major</button>
-        <button type="button" id="highlight-f-sharp-minor">Highlight F♯ minor</button>
-        <button type="button" id="clear-highlights">Clear highlights</button>
-      </p>
-      <p>
-        <label for="skin">Skin</label>
-        <select id="skin">
-          <option value="minimal">Minimal</option>
-          <option value="classic">Classic</option>
-        </select>
-        <label><input id="transparent-background" type="checkbox"> Transparent background</label>
-        <label><input id="hide-borders" type="checkbox"> Hide key borders</label>
-        <label><input id="animate-highlights" type="checkbox" checked> Animate highlights</label>
-      </p>
-      <div class="annotation-controls">
-        <label>Key labels
-          <select id="label-mode">
-            <option value="none">None</option>
-            <option value="note">Note names</option>
-            <option value="midi">MIDI numbers</option>
-            <option value="octave">Octaves</option>
-          </select>
-        </label>
-        <label><input id="emphasize-c" type="checkbox"> Emphasize C notes</label>
-        <label>Pressed keys
-          <select id="pressed-mode">
-            <option value="both">Color and indicator</option>
-            <option value="color">Color only</option>
-            <option value="indicator">Indicator only</option>
-          </select>
-        </label>
-        <label>Indicator shape
-          <select id="indicator-shape">
-            <option value="circle">Circle</option>
-            <option value="square">Square</option>
-          </select>
-        </label>
-        <label><input id="show-annotations" type="checkbox"> Show example annotations</label>
-      </div>
+      <h1>Keyboard playground</h1>
+      <form id="controls" novalidate>
+        <fieldset>
+          <legend>Preview layout</legend>
+          <div class="controls">
+            <label>Range
+              <select id="range">
+                <option value="octaves">C3–C5</option>
+                <option value="partial">F♯3–D♯4</option>
+                <option value="full">A0–C8</option>
+              </select>
+            </label>
+            <label>Orientation
+              <select id="orientation">
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+              </select>
+            </label>
+            <label>Sizing
+              <select id="sizing">
+                <option value="container">Container</option>
+                <option value="fixed">Fixed</option>
+              </select>
+            </label>
+            <label>Fixed width (px) <input id="width" type="number" min="1" step="any" placeholder="Intrinsic" disabled></label>
+            <label>Fixed height (px) <input id="height" type="number" min="1" step="any" placeholder="Intrinsic" disabled></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Appearance</legend>
+          <div class="controls">
+            <label>Skin
+              <select id="skin">
+                <option value="minimal">Minimal</option>
+                <option value="classic">Classic</option>
+                <option value="modern">Modern</option>
+                <option value="neon">Neon</option>
+                <option value="dark">Dark</option>
+                <option value="high-contrast">High contrast</option>
+              </select>
+            </label>
+            <label><input id="transparent-background" type="checkbox"> Transparent background</label>
+            <label><input id="hide-borders" type="checkbox"> Hide key borders</label>
+            <label>Key labels
+              <select id="label-mode">
+                <option value="none">None</option>
+                <option value="note">Note names</option>
+                <option value="midi">MIDI numbers</option>
+                <option value="octave">Octaves</option>
+              </select>
+            </label>
+            <label><input id="emphasize-c" type="checkbox"> Emphasize C notes</label>
+            <label><input id="show-annotations" type="checkbox"> Show example annotations</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Visual pressed state</legend>
+          <label for="notes">Pressed notes</label>
+          <div class="controls">
+            <input id="notes" type="text" aria-describedby="note-help" placeholder="C4, E4, G4" autocomplete="off">
+            <button type="submit">Apply notes</button>
+            <button type="button" id="highlight-chord">C major</button>
+            <button type="button" id="highlight-f-sharp-minor">F♯ minor</button>
+            <button type="button" id="clear-highlights">Clear notes</button>
+          </div>
+          <p id="note-help">Enter note names or MIDI numbers separated by spaces or commas.</p>
+          <div class="controls">
+            <label>Pressed appearance
+              <select id="pressed-mode">
+                <option value="both">Color and indicator</option>
+                <option value="color">Color only</option>
+                <option value="indicator">Indicator only</option>
+              </select>
+            </label>
+            <label>Indicator shape
+              <select id="indicator-shape">
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+              </select>
+            </label>
+            <label><input id="animate-highlights" type="checkbox" checked> Animate highlights</label>
+            <label>Duration (ms) <input id="duration" type="number" min="0" max="1000" step="any" placeholder="Skin default"></label>
+          </div>
+        </fieldset>
+        <p id="error" role="alert"></p>
+      </form>
       <div class="samples">
         <section id="horizontal" class="sample" aria-labelledby="horizontal-title">
           <header>
-            <h2 id="horizontal-title">Horizontal · C3–C5</h2>
-            <button type="button" aria-label="Download horizontal C3–C5 SVG">Download SVG</button>
+            <h2 id="horizontal-title">Preview</h2>
+            <button type="button" aria-label="Download preview SVG">Download SVG</button>
           </header>
-          <div class="keyboard-host"></div>
+          <div class="keyboard-host" data-sizing="container" data-orientation="horizontal"></div>
         </section>
         <section id="vertical" class="sample" aria-labelledby="vertical-title">
           <header>
@@ -73,6 +118,21 @@
           <div class="keyboard-host"></div>
         </section>
       </div>
+      <section class="sample" aria-labelledby="example-title">
+        <h2 id="example-title">Configuration example</h2>
+        <div class="controls">
+          <label>API
+            <select id="example-api">
+              <option value="mounted">Mounted keyboard</option>
+              <option value="static">Static SVG</option>
+            </select>
+          </label>
+          <button id="copy-example" type="button">Copy code</button>
+          <span id="copy-status" role="status"></span>
+        </div>
+        <label for="example">JavaScript</label>
+        <textarea id="example" readonly spellcheck="false" rows="12"></textarea>
+      </section>
     </main>
   </body>
 </html>

@@ -17,14 +17,6 @@ h1 {
   letter-spacing: -0.025em;
 }
 
-.annotation-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem 1rem;
-  margin-block: 1rem;
-}
-
 .samples {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -80,4 +72,42 @@ h1 {
   .samples {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #b8c3cf;
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+legend { font-weight: 600; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-block: 0.5rem;
+}
+
+input, select, button, textarea { font: inherit; }
+input[type="number"] { width: 6rem; }
+#notes { box-sizing: border-box; max-width: 100%; }
+#note-help { margin: 0.5rem 0; }
+#error { color: #8e2427; }
+#error:empty { display: none; }
+
+#horizontal .keyboard-host[data-sizing="container"] { height: 12rem; }
+#horizontal .keyboard-host[data-sizing="container"][data-orientation="vertical"] { height: 24rem; }
+
+main > section.sample { margin-top: 1rem; }
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0.5rem;
+  font: 0.9rem ui-monospace, monospace;
 }

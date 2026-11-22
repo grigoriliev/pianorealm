@@ -1,3 +1,5 @@
+import { defaultAccessibility, normalizeAccessibility } from './accessibility.js';
+import type { AccessibilityOptions } from './accessibility.js';
 import { defaultDecorations, normalizeIndicator, normalizeLabels, normalizeOverlays, noteMap } from './decorations.js';
 import type { DecorationConfig, IndicatorOptions, KeyOverlays, LabelOptions, NoteMap, PressedMode } from './decorations.js';
 import { findSkin, minimalAppearance, normalizeAppearance, resolveAppearance, validateColor } from '../skins/appearance.js';
@@ -43,6 +45,7 @@ export interface ConfigOptions {
   readonly sizing?: SizingOptions | undefined;
   readonly skin?: string | undefined;
   readonly appearance?: AppearanceOptions | undefined;
+  readonly accessibility?: AccessibilityOptions | undefined;
   readonly animation?: AnimationOptions | undefined;
   readonly labels?: LabelOptions | undefined;
   readonly highlights?: NoteMap<AppearanceColor> | undefined;
@@ -59,6 +62,7 @@ interface ConfigSnapshot extends DecorationConfig {
   readonly skin: string;
   readonly overrides: AppearanceOptions;
   readonly appearance: ResolvedAppearance;
+  readonly accessibility: AccessibilityOptions;
   readonly animationOverrides: AnimationOptions;
   readonly animation: ResolvedAnimation;
 }
@@ -72,7 +76,7 @@ const DEFAULT_SIZING = Object.freeze({
   blackKeyHeight: 60,
 } satisfies ResolvedSizing);
 
-export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance', 'animation', 'labels', 'highlights', 'pressedMode', 'indicator', 'overlays'] as const;
+export const CONFIG_FIELDS = ['range', 'orientation', 'notation', 'sizing', 'skin', 'appearance', 'accessibility', 'animation', 'labels', 'highlights', 'pressedMode', 'indicator', 'overlays'] as const;
 
 const SIZING_FIELDS = [...Object.keys(DEFAULT_SIZING), 'width', 'height'];
 
@@ -131,6 +135,7 @@ const DEFAULT_CONFIG: ConfigSnapshot = Object.freeze({
   skin: 'minimal',
   overrides: EMPTY_OVERRIDES,
   appearance: minimalAppearance,
+  accessibility: defaultAccessibility,
   animationOverrides: EMPTY_OVERRIDES,
   animation: resolveAnimation('minimal', EMPTY_OVERRIDES),
 });
@@ -190,6 +195,8 @@ export function normalizeConfig(
     ? previous.appearance
     : resolveAppearance(tokens, overrides);
 
+  const accessibility = Object.hasOwn(patch, 'accessibility')
+    ? normalizeAccessibility(patch.accessibility, previous.accessibility) : previous.accessibility;
   const animationOverrides = Object.hasOwn(patch, 'animation')
     ? normalizeAnimation(patch.animation, previous.animationOverrides)
     : previous.animationOverrides;
@@ -209,7 +216,7 @@ export function normalizeConfig(
   const overlays = Object.hasOwn(patch, 'overlays')
     ? noteMap(patch.overlays, notation, 'Overlays', normalizeOverlays) : previous.overlays;
   return Object.freeze({
-    orientation, notation, range, sizing, skin, overrides, appearance, animationOverrides, animation,
+    orientation, notation, range, sizing, skin, overrides, appearance, accessibility, animationOverrides, animation,
     pressedMode, labels, indicator, highlights, overlays,
   });
 }

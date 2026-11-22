@@ -5,7 +5,7 @@ import { describeDefinitions } from './definitions.js';
 import { staticPrefix } from './identifiers.js';
 import type { KeyboardScene } from '../scene/build-scene.js';
 import {
-  backgroundAttributes, describeDecorationLayer, describeIndicator, keyAttributes, rootAttributes, SVG_NS, viewportAttributes,
+  accessibilityAttributes, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, keyAttributes, rootAttributes, SVG_NS, viewportAttributes,
 } from './attributes.js';
 import type { Viewport } from './attributes.js';
 
@@ -35,9 +35,10 @@ function serializeNode(node: SvgNode): string {
 
 /** Private serializer for validated scenes. Explicit prefixes enable reproducible SVG bytes. */
 export function serializeScene(scene: KeyboardScene, viewport: Viewport = scene, idPrefix?: string): string {
-  const prefix = scene.definitions.length || idPrefix !== undefined ? staticPrefix(idPrefix) : '';
+  const prefix = scene.definitions.length || (scene.description && !scene.decorative) || idPrefix !== undefined ? staticPrefix(idPrefix) : '';
   const defs = scene.definitions.length ? serializeNode(describeDefinitions(scene.definitions, prefix)) : '';
-  const root = { xmlns: SVG_NS, ...viewportAttributes(viewport), ...rootAttributes(scene) };
+  const root = { xmlns: SVG_NS, ...viewportAttributes(viewport), ...rootAttributes(scene), ...accessibilityAttributes(scene, prefix) };
+  const description = describeAccessibility(scene, prefix);
   const background = `<rect${serializeAttributes(backgroundAttributes(scene))}/>`;
   const keys = scene.keys.map(key => `<rect${serializeAttributes(keyAttributes(key, prefix))}/>`).join('');
   const layer = (name: DecorationLayer) => {
@@ -45,5 +46,5 @@ export function serializeScene(scene: KeyboardScene, viewport: Viewport = scene,
     return node ? serializeNode(node) : '';
   };
   const indicators = scene.keys.map(key => serializeNode(describeIndicator(key))).join('');
-  return `<svg${serializeAttributes(root)}>${defs}${background}${keys}${layer('highlights')}${layer('labels')}${indicators}${layer('overlays')}</svg>`;
+  return `<svg${serializeAttributes(root)}>${description ? serializeNode(description) : ''}${defs}${background}${keys}${layer('highlights')}${layer('labels')}${indicators}${layer('overlays')}</svg>`;
 }

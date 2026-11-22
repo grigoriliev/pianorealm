@@ -1,5 +1,5 @@
 type SvgElementName =
-  | 'defs' | 'linearGradient' | 'stop' | 'filter' | 'feDropShadow' | 'clipPath'
+  | 'desc' | 'defs' | 'linearGradient' | 'stop' | 'filter' | 'feDropShadow' | 'clipPath'
   | 'g' | 'rect' | 'circle' | 'text';
 
 export type SvgAttributes = Readonly<Record<string, string | number>>;

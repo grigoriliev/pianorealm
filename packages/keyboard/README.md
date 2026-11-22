@@ -1,6 +1,6 @@
 # @pianorealm/keyboard
 
-The Pianorealm keyboard package renders a display-only piano as SVG. It provides the mounted keyboard, a DOM-free SVG generator, and note utilities through ESM with TypeScript declarations. Standalone classic scripts run offline. [Project state](PROJECT_STATE.md)
+The Pianorealm keyboard package renders a display-only piano as SVG. It provides the mounted keyboard, a DOM-free SVG generator, and note utilities through ESM with TypeScript declarations. Standalone classic scripts run offline. The package is in release preparation. This checkout builds a private development package for local use.
 
 ## Development
 
@@ -23,6 +23,29 @@ node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard
 To repeat the offline smoke test with Python 3 and Firefox, run `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 tests/artifacts/firefox-offline.py`. It creates a temporary Firefox profile and uses loopback for browser automation. Firefox loads the fixture and both scripts from local files with its network service offline.
 
 To run the guide's templates in Anki Desktop on Linux, use the [clean-profile Desktop test](docs/guides/anki-integration.md#run-the-clean-profile-desktop-test).
+
+## Install from a local build
+
+Run `npm ci`, `npm run build`, then `npm pack` from the checked-out `packages/keyboard` directory. npm prints the archive filename. In your own npm project, run `npm install /absolute/path/to/pianorealm-keyboard-0.0.0.tgz`, using the path and filename from your build. The packed package includes both browser scripts in `dist/`. Registry installation is planned.
+
+In a TypeScript app with DOM types, give the host CSS dimensions and mount after the element exists.
+
+```ts
+import { PianoKeyboard } from '@pianorealm/keyboard';
+import type { KeyboardOptions } from '@pianorealm/keyboard';
+
+const container = document.getElementById('piano');
+if (!container) throw new Error('Missing #piano');
+
+const options: KeyboardOptions = {
+  container,
+  range: { from: 'C3', to: 'C5' },
+  labels: { mode: 'note' },
+};
+const piano = new PianoKeyboard(options);
+piano.setPressedKeys(['C4', 'E4', 'G4']);
+// Call piano.destroy() when you remove the host.
+```
 
 ## Generate static SVG
 
@@ -75,13 +98,13 @@ Run `npm ci` if dependencies are missing, then start the demo from `packages/key
 npm run dev:demo
 ```
 
-Open [http://127.0.0.1:5173/demo/](http://127.0.0.1:5173/demo/), or use the port Vite prints if 5173 is busy. The page mounts horizontal and vertical C3–C5 keyboards and a full A0–C8 keyboard. All three render at their intrinsic size. Scroll inside a card if the keys exceed its width.
+Open [the playground](http://127.0.0.1:5173/demo/) or use the port Vite prints. **Preview layout** changes the first diagram. The vertical C3–C5 and full A0–C8 diagrams show the same appearance and pressed selection at fixed intrinsic sizes. Scroll within a preview when its drawing exceeds the card width.
 
-Use **Highlight C major** (C4, E4, G4) or **Highlight F♯ minor** (F♯3, A3, C♯4) to replace the pressed selection on all three keyboards. **Clear highlights** releases the pressed notes. Turn off **Animate highlights** to apply fills and indicators immediately.
+Enter note names or integer MIDI numbers separated by spaces or commas, or try the C major and F♯ minor presets. **Show example annotations** adds a “Do” label, a circle and badge on C4, a highlight and text overlay on E4, and a number on G4. **Indicator only** and **Square** make the pressed state distinguishable by shape. The controls belong to the playground. The piano drawing itself is display-only.
 
-Choose **Key labels** to compare note names, MIDI numbers, and octaves. **Emphasize C notes** adds a strip to each C key and makes its label bold when present. **Show example annotations** adds a custom “Do” label, dot, and badge on C4, an amber highlight and text overlay on E4, and a number on G4. These annotations stay in place when you release the chord or switch skins. To compare pressed styles, press a chord, choose **Indicator only**, and switch **Indicator shape** to **Square**.
+Copy the mounted or static JavaScript example for the current preview. Each **Download SVG** uses `PianoKeyboard.renderToSVG()` and captures the current diagram at its fixed or measured viewport size. Downloads use distinct prefixes for definition IDs. Static examples and downloads show the final appearance immediately.
 
-Each **Download SVG** button saves the current drawing with its labels, highlights, overlays, and final pressed appearance. The demo uses the source entry point and works without a prior build. It lives under `demo/` and is excluded from the production library bundle.
+The playground uses the public source entry point. The production bundle contains only library code.
 
 ## Note utilities
 
@@ -138,13 +161,24 @@ These methods control the drawing only. Minimal shows pressed keys with a blue f
 
 Ranges are inclusive. Their endpoints accept the same inputs as `normalizeNote`, and equal endpoints are valid, including a single black key. Reversed ranges throw `RangeError`. Defaults are A0–C8 (MIDI 21–108), horizontal orientation, default notation, and container sizing with white keys 20 × 100 and black keys 12 × 60 in pitch-axis width × depth.
 
-`setOptions(patch: KeyboardOptionsPatch)` merges fields in `notation`, `sizing`, `appearance`, `animation`, `labels`, and `indicator`. It replaces the whole `range` or note map (`labels.custom`, `highlights`, `overlays`) when supplied. New range and map names use the notation in the same patch. Previously ingested notes retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
+`setOptions(patch: KeyboardOptionsPatch)` merges fields in `notation`, `sizing`, `appearance`, `animation`, `labels`, `indicator`, and `accessibility`. It replaces the whole `range` or note map (`labels.custom`, `highlights`, `overlays`) when supplied. New range and map names use the notation in the same patch. Previously ingested notes retain their MIDI identities. An omitted field keeps its current value. Explicit `undefined` resets an optional field. An invalid patch leaves the current configuration, pressed notes and drawing intact. The container is selected at construction.
 
 Dimensions must be positive and finite. Black keys must be narrower than white keys and may be equally deep. Optional viewport dimensions apply in fixed sizing mode. To return to default container sizing and remove fixed viewport dimensions, use `piano.setOptions({ sizing: undefined })`.
 
 ## Skins and appearance
 
-Choose `skin: 'minimal'` (default) or `skin: 'classic'` at construction, or call `piano.setSkin(name)` after mounting. Minimal uses flat fills and blue pressed keys. Classic uses ivory and dark gradients, small corner radii, a subtle black-key shadow, and brown pressed keys. By default, both show a white dot on pressed keys. Skin and appearance changes preserve the SVG root, key nodes, geometry and pressed notes, including notes outside the range.
+Choose a built-in at construction or call `piano.setSkin(name)` after mounting. Skin and appearance changes preserve the SVG root, key nodes, geometry, and annotations and pressed notes, including those outside the range.
+
+| Skin | Appearance |
+| --- | --- |
+| `minimal` (default) | Flat ivory and dark keys with blue pressed fill |
+| `classic` | Ivory and dark gradients, rounded edges, a shadow, and brown pressed fill |
+| `modern` | Cool tones, restrained rounding and shadows, and a 150 ms transition |
+| `neon` | Dark violet host and vivid magenta pressed fill |
+| `dark` | Slate gray keys on a dark background with teal pressed fill |
+| `high-contrast` | Flat white and black keys and deep blue pressed fill |
+
+Use High Contrast with `pressedMode: 'both'` (the default) or `'indicator'` to distinguish the selected notes by a shape. Keep the default paints and indicator values to preserve the tested contrast. The default palettes use an outlined label so the label keeps a contrasting edge when the key is filled. Overrides, overlays, and colors inherited from a host require checking in context.
 
 ```ts
 piano.setSkin('classic');
@@ -162,7 +196,7 @@ piano.setSkin('studio');
 
 `registerSkin(name, appearance)` copies and validates the tokens for the lifetime of the instance. Names start with a lowercase ASCII letter. The remaining characters may be lowercase ASCII letters, digits or hyphens. Registration leaves the selected skin unchanged. Built-in names and names already registered on the same instance are reserved. Custom skins can be selected after registration. Each new instance starts with the built-ins.
 
-Resolution starts with Minimal defaults, applies the selected skin's tokens, and then applies explicit instance overrides. Skin selection keeps current overrides. Use `setOptions({ skin: undefined })` to return to Minimal. Custom colors may require contrast checks in the target host. An explicit high-contrast policy is planned for Phase 10.
+Resolution starts with Minimal defaults, applies the selected skin's tokens, and then applies explicit instance overrides. Skin selection keeps current overrides. Use `setOptions({ skin: undefined })` to return to Minimal. Custom colors may require contrast checks in the target host.
 
 | `AppearanceOptions` field | Accepted value |
 | --- | --- |
@@ -249,11 +283,28 @@ piano.setOptions({ animation: { enabled: false } });
 piano.setOptions({ animation: undefined }); // Restore the selected skin's motion defaults
 ```
 
-Motion is enabled by default. Minimal and custom skins use 120 ms with `ease-out`. Classic uses 160 ms with `ease-in-out`. The exported `AnimationOptions` accepts a finite duration from 0 through 1000 ms and an `AnimationEasing` of `linear`, `ease`, `ease-in`, `ease-out` or `ease-in-out`. Overrides survive skin changes. Reset an individual field with `undefined` to use the current skin's default.
+Motion is enabled by default. Classic uses 160 ms with `ease-in-out`. Modern uses 150 ms with `ease-out`. The other built-ins and custom skins use 120 ms with `ease-out`. The exported `AnimationOptions` accepts a finite duration from 0 through 1000 ms and an `AnimationEasing` of `linear`, `ease`, `ease-in`, `ease-out` or `ease-in-out`. Overrides survive skin changes. Reset an individual field with `undefined` to use the current skin's default.
 
 Mounted keyboards fade pressed indicators and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its indicator still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
 
 `enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. [Anki client test results](docs/guides/anki-integration.md#compatibility-matrix)
+
+## Accessible diagrams
+
+The mounted and static APIs expose a single SVG image with a name derived from its orientation and visible range. Set `accessibility.label` to provide your own name. Use `accessibility.description` for meaningful context such as the selected chord or an explanation of the overlays. The description is literal text, linked through an instance-scoped SVG ID. Both fields accept nonblank strings. Use `accessibility.decorative: true` when adjacent accessible text already conveys the diagram. In decorative mode the SVG is hidden from assistive technology. This never affects how the keys look.
+
+```ts
+piano.setOptions({
+  skin: 'high-contrast',
+  pressedMode: 'both',
+  accessibility: {
+    label: 'C major triad',
+    description: 'C4, E4 and G4 are pressed.',
+  },
+});
+```
+
+Update the description or adjacent text when a changed selection conveys new information. Pressing keys changes the SVG presentation without making an announcement. When using generated SVG as an image source, put the text alternative on the HTML image. At compact sizes, shorten the range or provide nearby text when key labels become too small. Choose the skin explicitly for dark mode. See the tested Anki configurations in the [compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix).
 
 ## Visualization events
 
@@ -302,4 +353,15 @@ Extensions can use `registerSkin()` and `setKeyOverlays()` through their existin
 
 ## Internal geometry
 
-The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serializer use the same scene derived from this layout and the resolved appearance. [Layout ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
+The engine takes a normalized MIDI range, orientation, and key dimensions in SVG user units. It returns frozen bounds for each included MIDI note in draw order, with whites before blacks. It keeps the full rectangle of each endpoint black key and the full white-key depth of the viewport. The vertical layout rotates those bounds so lower notes are at the bottom. Logical point lookup reads the same bounds. The mounted renderer and private SVG serializer use the same scene derived from this layout and the resolved appearance. [Layout ADR](https://github.com/grigoriliev/pianorealm/blob/main/packages/keyboard/docs/decisions/0002-layout-sizing-and-hit-testing.md)
+
+
+## Support, contributions, and license
+
+Development commands use the Node versions in `package.json`. The release checks currently use Node 24.22.1 and Firefox 160.0.1. Anki client results are documented per version. The built ESM API and offline browser scripts target ES2022. Hosts without `ResizeObserver` can call `resize()` explicitly after changing a container's size. For night mode choose the skin in your host application.
+
+Compose through the documented exports and use `getNoteAtPoint()` to map a viewport point to a MIDI note when your application owns the input. Human input, MIDI transport, and audio have separate roles in the Pianorealm ecosystem.
+
+For changes to the library, run the development checks and review the package specification and accepted decisions in the source checkout. For library integration, use the package root and the documented classic-script constructor. Private module paths, DOM and CSS internals can change before or after the first release. Corrections and breaking changes to published contracts will be recorded in the changelog with migration guidance.
+
+Apache License 2.0. [License](LICENSE) · [Changelog](CHANGELOG.md)

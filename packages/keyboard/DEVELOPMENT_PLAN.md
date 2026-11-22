@@ -81,8 +81,8 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Complete |
 | **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Complete |
 | **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Complete |
-| **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | In progress, Anki client checks pending |
-| **10** | Release hardening and publication prep | 1–9 | Complete release gates, docs, playground, QA | Not started |
+| **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | Complete within verified Linux scope |
+| **10** | Release hardening and publication prep | 1–9 | Complete release gates, docs, playground, QA | Complete |
 
 **Critical sequencing qualification:** Design static output, Anki compatibility, and hit-testing during **Phase 0**; establish shared scene abstractions in **Phase 3**. Phase 9 completes and verifies these capabilities—it must not require replacing the core renderer. Release tooling may be scaffolded in Phase 1; full packaging verification happens in Phases 9–10.
 
@@ -247,12 +247,12 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 - [x] Produce ESM and standalone classic-script variants, including a minified build and tested `Pianorealm.Keyboard` installation. [Distribution ADR](../../docs/decisions/0002-standalone-global-namespace.md)
 - [x] Add smoke tests for imports, global exposure, coexisting instances, offline execution, and absence of network dependency.
 - [x] Write an Anki guide covering media-file deployment, front/back card templates, horizontal/vertical initialization, state updates, night mode, multiple instances, and safe reinitialization.
-- [ ] Test Anki Desktop and mobile clients **where environments are actually available**; record version, OS, evidence, limitations, and untested clients separately. Include AnkiWeb if accessible and feasible.
+- [x] Verify the approved Phase 9 Anki scope on Desktop Linux and record other clients separately.
 - [x] Document embedded API fallbacks and behavior without `ResizeObserver` or other optional browser features.
 
 **Gate:** Static SVG is genuinely self-contained, standalone builds load without a module loader/network, and compatibility claims match verified environments.
 
-Static SVG and distribution checks passed. Actual-client verification is pending. [Phase 9 handoff](PROJECT_STATE.md#phase-9-handoff) · [Anki compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
+Gate passed. The project owner accepted the verified Anki Desktop Linux coverage as sufficient for Phase 9 on 2026-11-22. Windows and macOS Desktop, AnkiDroid, AnkiMobile, AnkiWeb, and media sync remain untested. [Phase 9 handoff](PROJECT_STATE.md#phase-9-handoff) · [Anki compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
 
 ## 15. Phase 10 — Release quality, developer experience, and publication prep
 
@@ -260,18 +260,20 @@ Static SVG and distribution checks passed. Actual-client verification is pending
 
 **Tasks**
 
-- [ ] Complete remaining specified built-in skins (**Modern, Neon, Dark**) and high-contrast/accessibility strategy; verify every supported visualization mode in every built-in skin.
-- [ ] Finalize validated public types, exports map, TypeScript declarations, source maps, scripts, license/metadata, and package contents. Decide CommonJS only if justified.
-- [ ] Write README, quick start, API/config reference, skin/overlay/extension guides, JS/TS examples, Anki guide, and release notes.
-- [ ] Build a playground using the actual package: ranges, orientations, skins, pressed state, size, animations, labels/overlays, and generated configuration example.
-- [ ] Curate a visual regression matrix across skins, orientations, representative ranges and states; baseline and run in a consistent browser environment.
-- [ ] Run complete unit/integration/typecheck/build tests and browser/accessibility checks; inspect SVG accessibility labels, contrast, non-color indicators, reduced motion, and CSS/ID isolation.
-- [ ] Verify lifecycle and performance (incremental state updates, rapid resizes, repeated initialization/destruction, large ranges, multi-instance use).
-- [ ] Execute npm package smoke tests from **built artifacts**, ESM/type imports, classic-script globals, offline/embedded usage, and supported static Node rendering.
-- [ ] Prepare changelog, semantic version decision, migration policy, known limitations, and publication checklist. Publishing itself is a separate authorized action.
-- [ ] Audit every requirement; identify any explicitly deferred feature and its effect on stated release promises.
+- [x] Complete remaining specified built-in skins (**Modern, Neon, Dark**) and high-contrast/accessibility strategy; verify every supported visualization mode in every built-in skin.
+- [x] Finalize validated public types, exports map, TypeScript declarations, source maps, scripts, license/metadata, and package contents. Decide CommonJS only if justified.
+- [x] Write README, quick start, API/config reference, skin/overlay/extension guides, JS/TS examples, Anki guide, and release notes.
+- [x] Build a playground using the actual package: ranges, orientations, skins, pressed state, size, animations, labels/overlays, and generated configuration example.
+- [x] Curate a visual regression matrix across skins, orientations, representative ranges and states; baseline and run in a consistent browser environment.
+- [x] Run complete unit/integration/typecheck/build tests and browser/accessibility checks; inspect SVG accessibility labels, contrast, non-color indicators, reduced motion, and CSS/ID isolation.
+- [x] Verify lifecycle and performance (incremental state updates, rapid resizes, repeated initialization/destruction, large ranges, multi-instance use).
+- [x] Execute npm package smoke tests from **built artifacts**, ESM/type imports, classic-script globals, offline/embedded usage, and supported static Node rendering.
+- [x] Prepare changelog, semantic version proposal, migration policy, known limitations, and publication checklist. Publishing itself is a separate authorized action.
+- [x] Audit every requirement; identify any explicitly deferred feature and its effect on stated release promises.
 
 **Gate:** All promised initial-release acceptance criteria are met by evidence, or the release scope/version is deliberately adjusted and documented. Do not mark complete on the strength of documentation alone.
+
+Gate passed for the documented verification scope. The release audit records each acceptance criterion, the untested environments, and the proposed version awaiting owner approval. [Phase 10 audit](docs/RELEASE_READINESS.md) · [Verification](PROJECT_STATE.md#phase-10-handoff)
 
 ## 16. Cross-cutting verification matrix
 

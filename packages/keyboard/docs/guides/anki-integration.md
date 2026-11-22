@@ -163,7 +163,7 @@ To exercise the runner's process cleanup and report parsing without launching An
 
 ## Compatibility matrix
 
-The Linux result comes from an automated run of the actual Anki Desktop application on 2026-11-22. The temporary profile used the templates above and copied media directly into `collection.media`. Anki ran offscreen with only loopback networking for its local media server. Sync and other Anki versions remain untested. [Anki 26.09.3 release](https://github.com/ankitects/anki/releases/tag/26.09.3) · [Test evidence](../../PROJECT_STATE.md#anki-desktop-checklist)
+The Linux result comes from an automated run of the actual Anki Desktop application on 2026-11-22. The temporary profile used the templates above and copied media directly into `collection.media`. Anki ran offscreen with only loopback networking for its local media server. The project owner accepted this coverage for Phase 9. Sync and other Anki clients and versions remain untested. [Anki 26.09.3 release](https://github.com/ankitects/anki/releases/tag/26.09.3) · [Test evidence](https://github.com/grigoriliev/pianorealm/blob/main/packages/keyboard/PROJECT_STATE.md#anki-desktop-checklist)
 
 | Client | OS/device | Client version | Scenario | Outcome |
 | --- | --- | --- | --- | --- |
