@@ -5,7 +5,7 @@ import { describeDefinitions } from './definitions.js';
 import { staticPrefix } from './identifiers.js';
 import type { KeyboardScene } from '../scene/build-scene.js';
 import {
-  accessibilityAttributes, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, keyAttributes, rootAttributes, SVG_NS, viewportAttributes,
+  accessibilityAttributes, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, describeKeyEdge, keyAttributes, rootAttributes, SVG_NS, viewportAttributes,
 } from './attributes.js';
 import type { Viewport } from './attributes.js';
 
@@ -40,7 +40,10 @@ export function serializeScene(scene: KeyboardScene, viewport: Viewport = scene,
   const root = { xmlns: SVG_NS, ...viewportAttributes(viewport), ...rootAttributes(scene), ...accessibilityAttributes(scene, prefix) };
   const description = describeAccessibility(scene, prefix);
   const background = `<rect${serializeAttributes(backgroundAttributes(scene))}/>`;
-  const keys = scene.keys.map(key => `<rect${serializeAttributes(keyAttributes(key, prefix))}/>`).join('');
+  const keys = scene.keys.map(key => {
+    const edge = describeKeyEdge(key, prefix);
+    return `<rect${serializeAttributes(keyAttributes(key, prefix))}/>${edge ? serializeNode(edge) : ''}`;
+  }).join('');
   const layer = (name: DecorationLayer) => {
     const node = describeDecorationLayer(scene, name, prefix);
     return node ? serializeNode(node) : '';

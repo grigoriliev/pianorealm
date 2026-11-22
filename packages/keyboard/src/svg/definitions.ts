@@ -17,9 +17,10 @@ export function describeDefinitions(definitions: readonly SceneDefinition[], pre
         };
       }
       if (definition.kind === 'gradient') {
+        const { direction } = definition;
         return {
           name: 'linearGradient',
-          attributes: { id, x1: 0, y1: 0, x2: definition.horizontal ? 0 : 1, y2: definition.horizontal ? 1 : 0 },
+          attributes: { id, x1: 0, y1: direction === 'up' ? 1 : 0, x2: direction === 'right' ? 1 : 0, y2: direction === 'down' ? 1 : 0 },
           children: definition.stops.map(({ offset, color }) => ({
             name: 'stop',
             attributes: { offset, 'stop-color': color },

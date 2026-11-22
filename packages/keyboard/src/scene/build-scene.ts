@@ -8,14 +8,15 @@ import type { KeyKind } from '../notes/notation.js';
 
 import type { KeyGradient, ResolvedAppearance } from '../skins/appearance.js';
 
-export type DefinitionSlot = 'white-gradient' | 'black-gradient' | 'black-shadow' | ReturnType<typeof clipSlot>;
-
 const gradientSlots = { white: 'white-gradient', black: 'black-gradient' } as const;
-type GradientSlot = typeof gradientSlots[KeyKind];
+const edgeSlots = { white: 'white-edge', black: 'black-edge' } as const;
+type EdgeSlot = typeof edgeSlots[KeyKind];
+type GradientSlot = typeof gradientSlots[KeyKind] | EdgeSlot;
+export type DefinitionSlot = GradientSlot | 'black-shadow' | ReturnType<typeof clipSlot>;
 type ScenePaint = string | Readonly<{ slot: GradientSlot }>;
 
 export type SceneDefinition = Readonly<
-  | { slot: GradientSlot; kind: 'gradient'; horizontal: boolean; stops: KeyGradient['stops'] }
+  | { slot: GradientSlot; kind: 'gradient'; direction: 'down' | 'right' | 'up'; stops: KeyGradient['stops'] }
   | { slot: 'black-shadow'; kind: 'shadow'; horizontal: boolean; opacity: number }
   | { slot: ReturnType<typeof clipSlot>; kind: 'clip'; bounds: readonly Bounds[] }
 >;
@@ -40,6 +41,7 @@ export type SceneKey = LayoutKey & Readonly<KeyPresentation> & {
   readonly strokeWidth: number;
   readonly cornerRadius: number;
   readonly shadow: boolean;
+  readonly edgeSlot: EdgeSlot | undefined;
   readonly indicator: ReturnType<typeof buildIndicator>;
   readonly decorations: ReturnType<typeof buildDecorations>;
 };
@@ -47,16 +49,19 @@ export type SceneKey = LayoutKey & Readonly<KeyPresentation> & {
 export interface KeyPresentation {
   fill: ScenePaint;
   indicatorDisplay: 'inline' | 'none';
+  edgeDisplay: 'inline' | 'none';
 }
 
 export function keyPresentation(
   kind: KeyKind, appearance: ResolvedAppearance, pressed: boolean, mode: PressedMode,
 ): KeyPresentation {
   const paint = appearance[kind];
+  const usePressedFill = pressed && mode !== 'indicator';
   return {
-    fill: pressed && mode !== 'indicator' ? appearance.pressed
+    fill: usePressedFill ? appearance.pressed
       : typeof paint === 'string' ? paint : Object.freeze({ slot: gradientSlots[kind] }),
     indicatorDisplay: pressed && mode !== 'color' ? 'inline' : 'none',
+    edgeDisplay: usePressedFill && !appearance.edgeLighting?.pressed ? 'none' : 'inline',
   };
 }
 
@@ -76,7 +81,15 @@ export function buildScene(
   for (const kind of ['white', 'black'] as const) {
     const paint = appearance[kind];
     if (typeof paint !== 'string') {
-      definitions.push(Object.freeze({ slot: gradientSlots[kind], kind: 'gradient', horizontal, stops: paint.stops }));
+      definitions.push(Object.freeze({
+        slot: gradientSlots[kind], kind: 'gradient', direction: horizontal ? 'down' : 'right', stops: paint.stops,
+      }));
+    }
+    const edge = appearance.edgeLighting?.[kind];
+    if (edge) {
+      definitions.push(Object.freeze({
+        slot: edgeSlots[kind], kind: 'gradient', direction: horizontal ? 'right' : 'up', stops: edge.stops,
+      }));
     }
   }
   if (appearance.blackKeyShadow > 0) {
@@ -93,6 +106,7 @@ export function buildScene(
     strokeWidth: appearance.strokeWidth,
     cornerRadius: appearance.cornerRadius,
     shadow: key.kind === 'black' && appearance.blackKeyShadow > 0,
+    edgeSlot: appearance.edgeLighting?.[key.kind] ? edgeSlots[key.kind] : undefined,
     indicator: buildIndicator(key, config, horizontal),
     decorations: buildDecorations(key, config, horizontal),
   }));

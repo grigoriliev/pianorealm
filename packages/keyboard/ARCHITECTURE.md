@@ -290,9 +290,11 @@ Decorations use intrinsic coordinates. Position fractions run along pitch, from 
 
 Skin objects **only** describe resolved appearance: backgrounds, key fills, borders, radii, shadow/gradient treatments, label colors, active-state visuals, indicator styles, and animation defaults. A skin **MUST NOT** change pitch order, MIDI numbers, state semantics, event delivery, or input behavior.
 
-The built-in skins are `minimal`, `classic`, `modern`, `neon`, `dark`, and `high-contrast`. `registerSkin(name, appearance)` validates and copies tokens into the keyboard instance, where `setSkin(name)` can select them. [Supported appearance tokens](README.md#skins-and-appearance)
+The built-in skins are `minimal`, `classic`, `realistic`, `modern`, `neon`, `dark`, and `high-contrast`. `registerSkin(name, appearance)` validates and copies tokens into the keyboard instance, where `setSkin(name)` can select them. [Supported appearance tokens](README.md#skins-and-appearance)
 
 Resolution applies Minimal defaults, selected skin tokens and explicit instance overrides in that order. The accepted policy places explicit accessibility settings last when they are introduced. Key dimensions belong to sizing options. [Configuration ADR](docs/decisions/0001-notes-configuration-and-state.md)
+
+The shared scene describes optional internal edge lighting as a gradient over the body's existing bounds. It draws immediately above its body and below subsequent keys and annotations. The two axes of lighting follow the layout's orientation. The same per-key presentation calculation controls fill, edge visibility and the pressed marker in static output and targeted updates. [Scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md)
 
 Keep styles scoped inside the component, including embedded and Anki usage. Avoid selectors that affect host `.card`, `body`, or generic `svg`/`rect` elements. Prefer inline SVG presentation attributes/embedded scoped styles where they improve standalone export and host isolation; define a consistent strategy so static and mounted output match. SVG definitions (gradients, filters, masks) require collision-safe IDs.
 

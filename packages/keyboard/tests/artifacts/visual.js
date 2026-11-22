@@ -1,5 +1,5 @@
 const Keyboard = Pianorealm.Keyboard;
-const matrix = [
+const original = [
   { title: 'Minimal · both', skin: 'minimal', pressedMode: 'both' },
   { title: 'Classic · color', skin: 'classic', pressedMode: 'color', orientation: 'vertical' },
   { title: 'Modern · indicator', skin: 'modern', pressedMode: 'indicator' },
@@ -14,11 +14,20 @@ const matrix = [
     full: true,
   },
 ];
+const octaves = { from: 'C3', to: 'C5' };
+const realistic = [
+  { title: 'Classic · C3–C5', skin: 'classic', range: octaves, pressed: [], wide: true },
+  { title: 'Realistic · C3–C5', skin: 'realistic', range: octaves, pressed: [], wide: true },
+  { title: 'Realistic · horizontal · both', skin: 'realistic', pressedMode: 'both' },
+  { title: 'Realistic · vertical · indicator', skin: 'realistic', pressedMode: 'indicator', orientation: 'vertical' },
+  { title: 'Realistic · A0–C8', skin: 'realistic', range: { from: 'A0', to: 'C8' }, wide: true },
+];
+const matrix = location.search === '?realistic' ? realistic : original;
 const main = document.querySelector('main');
 
-window.visualFixture = matrix.map(({ title, full, ...variant }, index) => {
+window.visualFixture = matrix.map(({ title, full, wide, pressed, ...variant }, index) => {
   const section = document.createElement('section');
-  section.className = full ? 'full' : 'compact';
+  section.className = full ? 'full' : wide ? 'wide' : 'compact';
   const heading = document.createElement('h2');
   heading.textContent = title;
   const row = document.createElement('div');
@@ -37,7 +46,13 @@ window.visualFixture = matrix.map(({ title, full, ...variant }, index) => {
     overlays: { C4: [{ type: 'badge', text: 1, depth: 0.52 }, { type: 'circle', color: '#ad5332' }] },
     ...variant,
   };
-  const pressedKeys = ['F#3', 'A3', 'C4'];
+  if (wide) {
+    delete visuals.labels;
+    delete visuals.overlays;
+    if (pressed?.length === 0) delete visuals.accessibility.description;
+    else visuals.accessibility.description = 'C, E and G are marked.';
+  }
+  const pressedKeys = pressed ?? (wide ? ['C4', 'E4', 'G4'] : ['F#3', 'A3', 'C4']);
   const dimensions = { width: container.clientWidth, height: container.clientHeight };
   const piano = new Keyboard({
     container, ...visuals, animation: { enabled: false },
@@ -46,5 +61,6 @@ window.visualFixture = matrix.map(({ title, full, ...variant }, index) => {
   piano.setPressedKeys(pressedKeys);
   const markup = Keyboard.renderToSVG({ ...visuals, sizing: dimensions, pressedKeys, idPrefix: `visual-${index}` });
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
-  return { piano, container, img, markup, full: Boolean(full) };
+  const count = visuals.range.from === 'A0' ? 88 : visuals.range === octaves ? 25 : 10;
+  return { piano, container, img, markup, count };
 });

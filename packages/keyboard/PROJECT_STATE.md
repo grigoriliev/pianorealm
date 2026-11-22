@@ -12,6 +12,27 @@
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
 
+## Realistic skin handoff
+
+- Select `skin: 'realistic'` with the mounted or static API, or call `setSkin('realistic')` on an existing instance. The playground keeps the same range, dimensions and annotations when comparing skins. [Usage and overrides](README.md#skins-and-appearance)
+- `src/skins/appearance.ts` defines immutable materials. The shared scene and SVG adapters add two scoped pitch-axis gradients and one optional edge rectangle per visible key. Depth gradients create a soft rear falloff and front bevels. The existing optional black-key filter supplies the contact shadow. Paint overrides retain precedence and the default pressed color keeps edge shading. The existing geometry, hit test, layer order and animation settings govern the new skin. The public change is the additional `BuiltInSkin` value.
+- Inspected both Firefox captures. The compact comparison shows warm white keytops and charcoal keys with narrow reflections and defined front faces. At the narrow full-range size, separators and selection cues remain visible while bevels recede. The annotated partial-range captures show pressed and indicator-only treatments in both orientations. [Desktop capture](tests/artifacts/visual-baselines/firefox-realistic-956.png) · [Narrow capture](tests/artifacts/visual-baselines/firefox-realistic-500.png)
+
+Commands ran from `packages/keyboard` on Debian 13.8 x86-64 with Node 24.22.1 and npm 11.19.1.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build && npm run test:artifacts` before edits | Type checking, 270 tests and all builds passed. The artifact suite passed 14 of 15 checks. The nested npm pack produced empty stdout inside the sandbox, causing a JSON parse error in the packed-consumer check. |
+| `npm run typecheck && npm test && npm run build` | Passed. 274 tests across eight files and all ESM and standalone bundles and declarations. Tests cover geometry and hit-test invariance, skin switches with off-range notes and annotations, atomic override rejection, local press updates and live/static parity. |
+| `npm run test:artifacts` | All 15 checks passed with local process permissions, including the packed consumer. Realistic SVG checks cover C3–C5, A0–C8, a black-endpoint range and a single black key in both orientations, with local ID references and deterministic static output. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 -B tests/artifacts/firefox-release.py --output /tmp/pianorealm-realistic-visual` | Passed in Firefox 160.0.1 after adding and reviewing two Realistic baselines using the same command with `--update-baselines`. The original two baselines matched byte for byte. The 500 px playground run verified Realistic selection, annotations and SVG export. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 -B tests/artifacts/firefox-offline.py` | Both standalone bundles passed. This includes rasterizing a single vertical Realistic black key at 25 × 12 px with the shadow disabled. |
+| `python3 -B -m unittest discover -s tests/anki` | Four runner tests passed. |
+| `python3 -B tests/anki/run.py --anki /tmp/pianorealm-anki26/anki-26.9.3-linux-x86_64.tar/anki --report /tmp/pianorealm-realistic-anki.jsonl` | Passed on Anki Desktop 26.09.3, QtWebEngine 6.11.2 / Chromium 140. Verified two live orientations and isolated IDs in the reviewer, plus rasterized Realistic SVG with and without the filter in the offline profile. |
+| `git diff --check` and `git status --short --untracked-files=all` from the repository root | Whitespace check passed. The pre-existing untracked package `.gitignore` was preserved. The two new PNGs are test baselines. |
+
+The finish is vector-based and its scale detail depends on available pixels. The added geometry is presentation-only. The default A0–C8 export measured about 43 KB of raw SVG versus 28 KB for Classic, and Realistic adds up to 88 edge rectangles for that range. Render-time performance was not benchmarked. Representative default paint samples in Anki give contrast ratios of 17.78:1 for dark label paint over a white key, 13.35:1 for white label paint over a black key and 8.38:1 for white against the pressed blue. These ratios describe sampled paint pairs. Tiny labels, arbitrary overrides, assistive technologies, other browser engines and other Anki platforms remain unverified.
+
 ## Phase 10 handoff
 
 - `src/skins/appearance.ts` adds Modern, Neon, Dark and High Contrast through the existing token pipeline, expanding `BuiltInSkin`. Modern has a 150 ms default transition. Neon uses a vivid fill in the default palette.

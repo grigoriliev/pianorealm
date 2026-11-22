@@ -105,6 +105,27 @@ for (const orientation of ['horizontal', 'vertical']) {
       assert.equal(svg.querySelectorAll('[data-note]').length, count);
       assert.equal(svg.querySelectorAll('circle[data-pressed-indicator][display="inline"]').length, 1);
       assert.equal(svg.querySelectorAll('[data-pressed-indicator][display="none"]').length, count - 1);
+
+      const options = {
+        skin: 'realistic', range: { from, to }, orientation, pressedKeys: [from],
+        idPrefix: 'acoustic', sizing: { width: 140, height: 80 },
+      };
+      const markup = render(options);
+      const realistic = parse(markup);
+      assert.equal(render(options), markup);
+      assert.equal(realistic.getAttribute('viewBox'), svg.getAttribute('viewBox'));
+      assert.equal(realistic.getAttribute('width'), '140');
+      assert.equal(realistic.getAttribute('height'), '80');
+      assert.equal(realistic.querySelectorAll('[data-key-edge][display="inline"]').length, count);
+      const edge = realistic.querySelector('linearGradient[id$="-edge"]');
+      assert.deepEqual(['x1', 'y1', 'x2', 'y2'].map(name => edge.getAttribute(name)),
+        orientation === 'horizontal' ? ['0', '0', '1', '0'] : ['0', '1', '0', '0']);
+      const ids = [...realistic.querySelectorAll('[id]')].map(node => node.id);
+      assert.equal(new Set(ids).size, ids.length);
+      const references = [...markup.matchAll(/url\(#([\w-]+)\)/g)].map(match => match[1]);
+      assert.ok(references.length > 0 && references.every(id => ids.includes(id)));
+      assert.equal(realistic.querySelector('script, style, image, foreignObject, [href], [onload]'), null);
+      assert.doesNotMatch(markup.replace('http://www.w3.org/2000/svg', ''), /https?:|url\((?!#)/);
     });
   }
 }

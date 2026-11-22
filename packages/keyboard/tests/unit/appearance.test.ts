@@ -4,6 +4,23 @@ import type { AppearanceOptions } from '../../src/index.js';
 import { findSkin, minimalAppearance, normalizeAppearance, resolveAppearance } from '../../src/skins/appearance.js';
 
 describe('appearance resolution', () => {
+  it('resolves the Realistic finish immutably and gives explicit paints precedence', () => {
+    const config = normalizeConfig({ skin: 'realistic' });
+    const lighting = config.appearance.edgeLighting!;
+    expect(lighting.white?.stops).toHaveLength(5);
+    expect(lighting.black?.stops).toHaveLength(5);
+    expect(Object.isFrozen(lighting)).toBe(true);
+    expect(Object.isFrozen(lighting.white?.stops[0])).toBe(true);
+    const customized = normalizeConfig({ appearance: { white: 'transparent', pressed: '#120' } }, config);
+    expect(customized.appearance).toMatchObject({
+      white: 'transparent', pressed: '#120', edgeLighting: { white: undefined, black: lighting.black, pressed: false },
+    });
+    expect(normalizeConfig({ appearance: { white: undefined, pressed: undefined } }, customized).appearance)
+      .toEqual(config.appearance);
+    expect(normalizeConfig({ skin: 'realistic' }).appearance.edgeLighting).toEqual(lighting);
+    expect(normalizeConfig({ skin: 'classic' }).appearance.edgeLighting).toBeUndefined();
+  });
+
   it('uses immutable Minimal defaults and deeply frozen Classic definitions', () => {
     const classic = normalizeConfig({ skin: 'classic' }).appearance;
     expect(normalizeConfig().appearance).toEqual(minimalAppearance);

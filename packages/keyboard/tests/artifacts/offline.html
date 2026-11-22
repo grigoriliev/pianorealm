@@ -114,20 +114,30 @@ async function run() {
   });
   const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml');
   check(parsed.documentElement.localName === 'svg' && parsed.querySelector('clipPath'), 'Static SVG or clip missing');
-  const image = new Image();
-  const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
-  try {
-    image.src = url;
-    await image.decode();
-    const canvas = document.createElement('canvas');
-    canvas.width = image.width;
-    canvas.height = image.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(image, 0, 0);
-    check(ctx.getImageData(150, 92, 1, 1).data.join() === '133,80,43,255', 'Offline SVG did not paint pressed fill');
-  } finally {
-    URL.revokeObjectURL(url);
+  async function rasterPixel(svg, x, y) {
+    const image = new Image();
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    try {
+      image.src = url;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0);
+      return ctx.getImageData(x, y, 1, 1).data;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
+  check((await rasterPixel(markup, 150, 92)).join() === '133,80,43,255', 'Offline SVG did not paint pressed fill');
+  const realistic = Keyboard.renderToSVG({
+    range: { from: 'F#4', to: 'F#4' }, skin: 'realistic', orientation: 'vertical',
+    sizing: { width: 25, height: 12 }, pressedKeys: ['F#4'], pressedMode: 'indicator',
+    appearance: { blackKeyShadow: 0 },
+  });
+  const singleKey = await rasterPixel(realistic, 7, 6);
+  check(singleKey[3] === 255 && singleKey[0] > 15 && singleKey[0] < 60, 'Tiny vertical Realistic key lost its shading');
   const resources = performance.getEntriesByType('resource').map(entry => new URL(entry.name));
   check(resources.every(url => url.protocol === 'file:' || url.protocol === 'blob:'), 'Unexpected remote resource');
   check(blocked.length === 0, 'Blocked resource: ' + blocked.join(', '));

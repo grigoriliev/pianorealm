@@ -56,7 +56,7 @@ import type { StaticKeyboardOptions } from '@pianorealm/keyboard';
 const options: StaticKeyboardOptions = {
   range: { from: 'C3', to: 'C5' },
   orientation: 'horizontal',
-  skin: 'classic',
+  skin: 'realistic',
   sizing: { width: 300, height: 100 },
   pressedKeys: ['C4', 'E4', 'G4'],
   idPrefix: 'chart-c-major',
@@ -173,6 +173,7 @@ Choose a built-in at construction or call `piano.setSkin(name)` after mounting. 
 | --- | --- |
 | `minimal` (default) | Flat ivory and dark keys with blue pressed fill |
 | `classic` | Ivory and dark gradients, rounded edges, a shadow, and brown pressed fill |
+| `realistic` | Warm polished keytops, charcoal black keys with edge reflections and front bevels, and deep blue pressed fill |
 | `modern` | Cool tones, restrained rounding and shadows, and a 150 ms transition |
 | `neon` | Dark violet host and vivid magenta pressed fill |
 | `dark` | Slate gray keys on a dark background with teal pressed fill |
@@ -181,7 +182,7 @@ Choose a built-in at construction or call `piano.setSkin(name)` after mounting. 
 Use High Contrast with `pressedMode: 'both'` (the default) or `'indicator'` to distinguish the selected notes by a shape. Keep the default paints and indicator values to preserve the tested contrast. The default palettes use an outlined label so the label keeps a contrasting edge when the key is filled. Overrides, overlays, and colors inherited from a host require checking in context.
 
 ```ts
-piano.setSkin('classic');
+piano.setSkin('realistic');
 piano.setOptions({ appearance: { background: 'transparent', white: '#fff8e9' } });
 piano.setOptions({ appearance: { white: undefined } }); // Restore the selected skin's white-key paint
 piano.setOptions({ appearance: undefined });           // Remove all instance overrides
@@ -210,6 +211,8 @@ Resolution starts with Minimal defaults, applies the selected skin's tokens, and
 Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unknown names and fields, unsupported paint syntax and malformed tokens throw `TypeError`. Out-of-range numeric tokens throw `RangeError`. The root exports `BuiltInSkin`, `AppearanceOptions`, `AppearanceColor`, `KeyPaint`, `KeyGradient` and `GradientStop`.
 
 Gradient and shadow definitions travel with the SVG and use instance-specific IDs. Static diagrams select a built-in skin and apply inline appearance options. [Generate static SVG](#generate-static-svg)
+
+Realistic uses depth gradients for the keytops and a translucent reflection across the width of each key. The reflection stays visible over the default pressed color and rotates with vertical layouts. An explicit `white` or `black` paint replaces that key type's material finish. An explicit `pressed` color replaces the finish while that color is shown. The lighting scales with the key bounds. Fine bevels and labels can become hard to see when a full keyboard is fitted to a narrow viewport. Set `appearance: { blackKeyShadow: 0 }` to use the gradient and bevel finish without the SVG filter.
 
 ## Labels, highlights, and overlays
 
@@ -285,7 +288,7 @@ piano.setOptions({ animation: undefined }); // Restore the selected skin's motio
 
 Motion is enabled by default. Classic uses 160 ms with `ease-in-out`. Modern uses 150 ms with `ease-out`. The other built-ins and custom skins use 120 ms with `ease-out`. The exported `AnimationOptions` accepts a finite duration from 0 through 1000 ms and an `AnimationEasing` of `linear`, `ease`, `ease-in`, `ease-out` or `ease-in-out`. Overrides survive skin changes. Reset an individual field with `undefined` to use the current skin's default.
 
-Mounted keyboards fade pressed indicators and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its indicator still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
+Mounted keyboards fade pressed indicators and transition between solid key fills. Classic and Realistic switch immediately between gradient and solid fills, with their indicators still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
 
 `enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. [Anki client test results](docs/guides/anki-integration.md#compatibility-matrix)
 

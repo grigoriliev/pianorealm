@@ -4,7 +4,7 @@ const documentAllocator = Symbol.for('@pianorealm/keyboard/svg-identifiers');
 type IdSlot = DefinitionSlot | 'description';
 const slots: readonly IdSlot[] = [
   'description',
-  'white-gradient', 'black-gradient', 'black-shadow',
+  'white-gradient', 'black-gradient', 'white-edge', 'black-edge', 'black-shadow',
   ...Array.from({ length: 128 }, (_, note): DefinitionSlot => `key-clip-${note}`),
 ];
 let nextStaticId = 0;

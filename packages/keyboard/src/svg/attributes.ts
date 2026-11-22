@@ -78,6 +78,17 @@ export function keyStyleAttributes(key: SceneKey, prefix: string) {
   };
 }
 
+export function describeKeyEdge(key: SceneKey, prefix: string): SvgNode | undefined {
+  if (!key.edgeSlot) return;
+  return {
+    name: 'rect',
+    attributes: {
+      ...key.bounds, rx: key.cornerRadius, fill: definitionReference(prefix, key.edgeSlot),
+      display: key.edgeDisplay, 'pointer-events': 'none', 'aria-hidden': 'true', 'data-key-edge': '',
+    },
+  };
+}
+
 export function describeIndicator(key: SceneKey): SvgNode {
   const { cx, cy, r, shape, ...paint } = key.indicator;
   const common = {

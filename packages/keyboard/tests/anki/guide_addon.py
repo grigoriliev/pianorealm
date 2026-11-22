@@ -104,6 +104,56 @@ def check(view, label, chord, markers, sides, dark=False, narrow=False):
     log(label, **result)
 
 
+def check_realistic(view):
+    js(view, """(() => {
+        const Keyboard = Pianorealm.Keyboard;
+        const fixture = document.createElement('section');
+        document.body.appendChild(fixture);
+        const options = { skin: 'realistic', range: { from: 'C3', to: 'C5' } };
+        const pianos = ['horizontal', 'vertical'].map(orientation => {
+            const container = fixture.appendChild(document.createElement('div'));
+            const piano = new Keyboard({ ...options, container, orientation, sizing: { mode: 'fixed' } });
+            piano.setPressedKeys(['C4', 'E4', 'G4']);
+            return piano;
+        });
+        const ids = Array.from(fixture.querySelectorAll('svg [id]'), node => node.id);
+        const live = {
+            uniqueIds: ids.length === 10 && ids.length === new Set(ids).size,
+            edges: fixture.querySelectorAll('[data-key-edge]').length,
+            pressed: fixture.querySelectorAll('[data-pressed-indicator][display="inline"]').length,
+        };
+        for (const piano of pianos) piano.destroy();
+        fixture.remove();
+
+        const readPixels = async blackKeyShadow => {
+            const markup = Keyboard.renderToSVG({
+                ...options, pressedKeys: ['C4', 'E4', 'G4'], appearance: { blackKeyShadow },
+            });
+            const image = new Image();
+            image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0);
+            const pixel = (x, y) => [...ctx.getImageData(x, y, 1, 1).data];
+            return { pressed: pixel(150, 92), white: pixel(10, 90), black: pixel(20, 12), contact: pixel(20, 61) };
+        };
+        Promise.all([readPixels(0.5), readPixels(0)]).then(
+            ([shadow, fallback]) => { window.realisticCheck = { live, shadow, fallback }; },
+            error => { window.realisticCheck = { error: String(error) }; },
+        );
+    })()""")
+    result = until(view, "window.realisticCheck", bool, "Realistic SVG paint")
+    assert result["live"] == {"uniqueIds": True, "edges": 50, "pressed": 6}, result
+    for paint in (result["shadow"], result["fallback"]):
+        assert paint["pressed"] == [37, 82, 109, 255], result
+        assert paint["white"][0] > 240 and 20 < paint["black"][0] < 65, result
+    assert result["shadow"]["contact"][0] < result["fallback"]["contact"][0], result
+    log("Realistic mounted and static SVG offline", **result)
+
+
 def make_deck(mw, title, front, back, css, chords):
     models = mw.col.models
     note_type = models.new("Phase 9 " + title)
@@ -292,6 +342,7 @@ def run():
 
     web = review(did)
     check(web, "review first front offline", *a, ["Horizontal"])
+    check_realistic(web)
     js(web, "window.phase9ReviewRealm = true")
     mw.reviewer._showAnswer()
     check(web, "review first back offline", *a, ["Vertical", "Horizontal"])

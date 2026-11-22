@@ -1,4 +1,5 @@
 import { validateRecord } from '../internal/validate-record.js';
+import type { KeyKind } from '../notes/notation.js';
 
 /** A hexadecimal SVG color or "transparent". */
 export type AppearanceColor = string;
@@ -26,8 +27,14 @@ export interface AppearanceOptions {
   readonly blackKeyShadow?: number | undefined;
 }
 
+type SkinAppearance = AppearanceOptions & {
+  readonly edgeLighting?: Readonly<Record<KeyKind, KeyGradient>>;
+};
+
 export type ResolvedAppearance = {
   readonly [Field in keyof AppearanceOptions]-?: NonNullable<AppearanceOptions[Field]>;
+} & {
+  readonly edgeLighting?: Readonly<Record<KeyKind, KeyGradient | undefined> & { pressed: boolean }>;
 };
 
 export const minimalAppearance = Object.freeze({
@@ -51,9 +58,55 @@ const classic = normalizeAppearance({
   blackKeyShadow: 0.28,
 });
 
+const realistic = Object.freeze({
+  ...normalizeAppearance({
+    background: '#383331',
+    white: { stops: [
+      { offset: 0, color: '#cbc6bd' },
+      { offset: 0.09, color: '#eae5da' },
+      { offset: 0.38, color: '#f5f2e9' },
+      { offset: 0.96, color: '#fffdf6' },
+      { offset: 0.98, color: '#efe9dc' },
+      { offset: 1, color: '#d5cec1' },
+    ] },
+    black: { stops: [
+      { offset: 0, color: '#191819' },
+      { offset: 0.10, color: '#353333' },
+      { offset: 0.44, color: '#282628' },
+      { offset: 0.87, color: '#171618' },
+      { offset: 0.91, color: '#302e30' },
+      { offset: 0.94, color: '#222123' },
+      { offset: 1, color: '#111012' },
+    ] },
+    boundary: '#423d38',
+    strokeWidth: 0.65,
+    cornerRadius: 0.75,
+    pressed: '#5582ad',
+    blackKeyShadow: 0.5,
+  }),
+  // Translucent pitch-axis reflections rotate with the keys and can shade a solid pressed fill.
+  edgeLighting: Object.freeze({
+    white: gradient({ stops: [
+      { offset: 0, color: '#67605654' },
+      { offset: 0.04, color: '#ffffff80' },
+      { offset: 0.16, color: '#ffffff00' },
+      { offset: 0.88, color: '#72695d00' },
+      { offset: 1, color: '#72695d65' },
+    ] }, 'realistic.white edge'),
+    black: gradient({ stops: [
+      { offset: 0, color: '#0a090b75' },
+      { offset: 0.10, color: '#e2dbd746' },
+      { offset: 0.25, color: '#e2dbd70a' },
+      { offset: 0.68, color: '#08070a00' },
+      { offset: 1, color: '#08070aae' },
+    ] }, 'realistic.black edge'),
+  }),
+} satisfies SkinAppearance);
+
 const builtInSkins = {
   minimal: minimalAppearance,
   classic,
+  realistic,
   modern: normalizeAppearance({
     background: '#cbd5df', white: '#f4f8fc', black: '#203143', boundary: '#536577',
     cornerRadius: 2.5, blackKeyShadow: 0.18, pressed: '#306997',
@@ -70,11 +123,11 @@ const builtInSkins = {
     background: '#000000', white: '#ffffff', black: '#000000', boundary: '#737373',
     pressed: '#005a85',
   }),
-} satisfies Record<string, AppearanceOptions>;
+} satisfies Record<string, SkinAppearance>;
 
 export type BuiltInSkin = keyof typeof builtInSkins;
 
-export function findSkin(name: string, customSkins?: ReadonlyMap<string, AppearanceOptions>): AppearanceOptions | undefined {
+export function findSkin(name: string, customSkins?: ReadonlyMap<string, AppearanceOptions>): SkinAppearance | undefined {
   return Object.hasOwn(builtInSkins, name) ? builtInSkins[name as BuiltInSkin] : customSkins?.get(name);
 }
 
@@ -95,6 +148,10 @@ export function validateNonnegative(value: unknown, field: string, max = Number.
 
 function paint(value: unknown, field: string): KeyPaint {
   if (typeof value === 'string') return validateColor(value, field);
+  return gradient(value, field);
+}
+
+function gradient(value: unknown, field: string): KeyGradient {
   validateRecord(value, ['stops'], field);
   const { stops } = value as KeyGradient;
   if (!Array.isArray(stops) || stops.length < 2 || stops.length > 8) {
@@ -134,8 +191,13 @@ export function normalizeAppearance(
   return Object.freeze(result);
 }
 
-export function resolveAppearance(skin: AppearanceOptions, overrides: AppearanceOptions): ResolvedAppearance {
+export function resolveAppearance(skin: SkinAppearance, overrides: AppearanceOptions): ResolvedAppearance {
   const selected = { ...skin, ...overrides };
+  const edgeLighting = skin.edgeLighting && Object.freeze({
+    white: overrides.white === undefined ? skin.edgeLighting.white : undefined,
+    black: overrides.black === undefined ? skin.edgeLighting.black : undefined,
+    pressed: overrides.pressed === undefined,
+  });
   return Object.freeze({
     background: selected.background ?? minimalAppearance.background,
     white: selected.white ?? minimalAppearance.white,
@@ -145,5 +207,6 @@ export function resolveAppearance(skin: AppearanceOptions, overrides: Appearance
     cornerRadius: selected.cornerRadius ?? minimalAppearance.cornerRadius,
     pressed: selected.pressed ?? minimalAppearance.pressed,
     blackKeyShadow: selected.blackKeyShadow ?? minimalAppearance.blackKeyShadow,
+    ...(edgeLighting && { edgeLighting }),
   });
 }

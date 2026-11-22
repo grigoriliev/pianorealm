@@ -155,7 +155,7 @@ npm run build
 python3 tests/anki/run.py --anki "/path/to/extracted/anki" --report /tmp/pianorealm-anki-results.jsonl
 ```
 
-The runner creates and removes a temporary profile and serves local media over loopback in a namespace with no external routes. It needs no Anki account or running desktop session. It reads the HTML templates, styling, customization, and SVG example from this guide. The test checks setup through **Manage Note Types**, **Fields**, **Cards**, and **Add**, then exercises preview, review, resizing, night mode, static SVG, and bad-input and missing-media diagnostics.
+The runner creates and removes a temporary profile and serves local media over loopback in a namespace with no external routes. It needs no Anki account or running desktop session. It reads the HTML templates, styling, customization, and SVG example from this guide. The test checks setup through **Manage Note Types**, **Fields**, **Cards**, and **Add**, then exercises preview, review, resizing, night mode, static SVG, and bad-input and missing-media diagnostics. During review it also checks two Realistic mounts and rasterizes the exported skin with and without its optional shadow.
 
 A successful run prints `PASS` and exits with status 0. The optional `--report` argument saves the client version and observations as JSON Lines, including any observations recorded before a failure. If Anki fails to start or a check fails, the runner exits nonzero and prints Anki's log. The runner stops its child processes on timeout or interruption. If `unshare` or `ip link set lo up` fails with a permission error, use a Linux environment that supports user network namespaces for this test.
 

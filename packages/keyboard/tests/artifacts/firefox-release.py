@@ -44,9 +44,17 @@ def check_visual(driver, directory, update, output):
     driver.call("Marionette:SetContext", value="chrome")
     assert driver.evaluate("Services.io.offline = true; return Services.io.offline;")
     driver.call("Marionette:SetContext", value="content")
+    check_visual_matrix(driver, fixture.as_uri(), "firefox", "Minimal · both", update, output)
+    check_visual_matrix(driver, fixture.as_uri() + "?realistic", "firefox-realistic", "Classic · C3–C5", update, output)
+    driver.call("Marionette:SetContext", value="chrome")
+    assert driver.evaluate("Services.io.offline = false; return !Services.io.offline;")
+    driver.call("Marionette:SetContext", value="content")
+
+
+def check_visual_matrix(driver, url, name_prefix, first_label, update, output):
     for width, height in ((956, 544), (500, 1100)):
         driver.call("WebDriver:SetWindowRect", width=width, height=height)
-        driver.call("WebDriver:Navigate", url=fixture.as_uri())
+        driver.call("WebDriver:Navigate", url=url)
         until(lambda: driver.evaluate("""
             return window.visualFixture?.every(({img}) => img.complete && img.naturalWidth > 0);
         """), "visual fixture or SVG images failed to load")
@@ -54,7 +62,7 @@ def check_visual(driver, directory, update, output):
             const items = window.visualFixture;
             const ids = [...document.querySelectorAll('svg [id]')].map(el => el.id);
             if (ids.length !== new Set(ids).size) return false;
-            return items.every(({piano, container, markup, full}) => {
+            return items.every(({piano, container, markup, count}) => {
                 const svg = container.querySelector('svg');
                 const staticSvg = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
                 const description = svg.querySelector('desc');
@@ -66,18 +74,18 @@ def check_visual(driver, directory, update, output):
                 ).matrixTransform(box);
                 return svg.getAttribute('role') === 'img'
                     && svg.getAttribute('aria-label') === staticSvg.getAttribute('aria-label')
-                    && svg.getAttribute('aria-describedby') === description.id
-                    && staticSvg.getAttribute('aria-describedby') === staticSvg.querySelector('desc').id
+                    && svg.getAttribute('aria-describedby') === (description?.id ?? null)
+                    && staticSvg.getAttribute('aria-describedby') === (staticSvg.querySelector('desc')?.id ?? null)
                     && !svg.querySelector('[tabindex], [role="button"]')
-                    && svg.querySelectorAll('[data-note]').length === (full ? 88 : 10)
+                    && svg.querySelectorAll('[data-note]').length === count
                     && svg.getAttribute('viewBox') === staticSvg.getAttribute('viewBox')
                     && piano.getNoteAtPoint(center.x, center.y) === 54;
             });
         """), "visual fixture structure, accessible metadata, or hit testing failed"
-        accessible(driver, ".mounted svg", "img", "Minimal · both")
-        accessible(driver, ".compact img", "img", "Minimal · both")
+        accessible(driver, ".mounted svg", "img", first_label)
+        accessible(driver, ".pair img", "img", first_label)
         screenshot = driver.call("WebDriver:TakeScreenshot", full=True)["value"]
-        name = f"firefox-{width}.png"
+        name = f"{name_prefix}-{width}.png"
         image = b64decode(screenshot)
         destination = output / name
         destination.write_bytes(image)
@@ -88,9 +96,6 @@ def check_visual(driver, directory, update, output):
         else:
             assert baseline.read_bytes() == image, f"Screenshot differs. Inspect {destination} against {baseline}"
         print(f"{name} PASS ({'baseline updated' if update else 'baseline match'})")
-    driver.call("Marionette:SetContext", value="chrome")
-    assert driver.evaluate("Services.io.offline = false; return !Services.io.offline;")
-    driver.call("Marionette:SetContext", value="content")
 
 
 def check_playground(driver, directory):
@@ -148,7 +153,7 @@ def check_playground(driver, directory):
                     require(active() === 2 && !formError(), 'valid deduplicated note selection');
                     choose('range', 'partial');
                     choose('orientation', 'vertical');
-                    choose('skin', 'neon');
+                    choose('skin', 'realistic');
                     choose('sizing', 'fixed');
                     choose('width', '120');
                     choose('height', '180');
@@ -165,10 +170,11 @@ def check_playground(driver, directory):
                     require(root().querySelector('[data-note="60"]').getAttribute('stroke-width') === '0', 'appearance');
                     require(root().querySelector('rect[data-pressed-indicator][display="inline"]'), 'square indicator');
                     require(root().querySelector('[data-layer="overlays"]'), 'annotations');
+                    require(root().querySelector('[data-key-edge]'), 'Realistic finish');
                     require(get('example').value.includes('"duration": 170'), 'mounted motion snippet');
                     choose('example-api', 'static');
                     const example = get('example').value;
-                    require(example.includes('"skin": "neon"') && example.includes('"height": 180')
+                    require(example.includes('"skin": "realistic"') && example.includes('"height": 180')
                         && !example.includes('animation'), 'static config');
                     const exampleScript = document.createElement('script');
                     exampleScript.type = 'module';

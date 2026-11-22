@@ -3,7 +3,7 @@ import type { KeyboardScene, KeyPresentation, SceneKey } from '../scene/build-sc
 import { decorationLayers } from '../scene/key-decorations.js';
 import type { DecorationLayer } from '../scene/key-decorations.js';
 import {
-  accessibilityAttributes, accessibilityAttributeNames, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, fillAttribute, keyAttributes, keyStyleAttributes,
+  accessibilityAttributes, accessibilityAttributeNames, backgroundAttributes, describeAccessibility, describeDecorationLayer, describeIndicator, describeKeyEdge, fillAttribute, keyAttributes, keyStyleAttributes,
   rootAttributes, SVG_NS, viewportAttributes,
 } from './attributes.js';
 import type { Viewport } from './attributes.js';
@@ -21,6 +21,7 @@ function applyAttributes(element: SVGElement, attributes: SvgAttributes): void {
 interface KeyNodes {
   readonly kind: SceneKey['kind'];
   readonly body: SVGRectElement;
+  edge: SVGElement | undefined;
   indicator: SVGElement;
   indicatorAttributes: SvgAttributes;
 }
@@ -57,9 +58,12 @@ export function buildSvg(document: Document, scene: KeyboardScene, prefix: strin
     const body = document.createElementNS(SVG_NS, 'rect');
     applyAttributes(body, keyAttributes(key, prefix));
     root.appendChild(body);
+    const edgeDescriptor = describeKeyEdge(key, prefix);
+    const edge = edgeDescriptor && materialize(document, edgeDescriptor);
+    if (edge) root.appendChild(edge);
     const descriptor = describeIndicator(key);
     const indicator = materialize(document, descriptor);
-    keys.set(key.note, { kind: key.kind, body, indicator, indicatorAttributes: descriptor.attributes });
+    keys.set(key.note, { kind: key.kind, body, edge, indicator, indicatorAttributes: descriptor.attributes });
   }
   for (const { indicator } of keys.values()) root.appendChild(indicator);
   const drawing = { root, keys, background, defs, definitions: scene.definitions, layers: new Map<DecorationLayer, DecorationNodes>() };
@@ -159,6 +163,16 @@ export function updateSvg(
   for (const key of scene.keys) {
     const nodes = drawing.keys.get(key.note)!;
     applyAttributes(nodes.body, geometryChanged ? keyAttributes(key, prefix) : keyStyleAttributes(key, prefix));
+    const edge = describeKeyEdge(key, prefix);
+    if (edge && nodes.edge) {
+      applyAttributes(nodes.edge, edge.attributes);
+    } else if (edge) {
+      nodes.edge = materialize(drawing.root.ownerDocument, edge);
+      nodes.body.after(nodes.edge);
+    } else if (nodes.edge) {
+      nodes.edge.remove();
+      nodes.edge = undefined;
+    }
     const indicator = describeIndicator(key);
     if (nodes.indicator.localName !== indicator.name) {
       const replacement = materialize(drawing.root.ownerDocument, indicator);
@@ -177,6 +191,7 @@ export function updateSvg(
 
 export function updateKeyPresentation(nodes: KeyNodes, presentation: KeyPresentation, prefix: string): void {
   setAttribute(nodes.body, 'fill', fillAttribute(presentation, prefix));
+  if (nodes.edge) setAttribute(nodes.edge, 'display', presentation.edgeDisplay);
   setAttribute(nodes.indicator, 'display', presentation.indicatorDisplay);
 }
 

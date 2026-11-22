@@ -510,6 +510,77 @@ describe('programmatic pressed keys', () => {
 });
 
 describe('mounted appearance', () => {
+  it('keeps Realistic edge updates local and preserves annotations, geometry and selection when switching skins', () => {
+    const piano = mount({
+      range: { from: 61, to: 63 }, sizing: { mode: 'fixed' }, skin: 'classic',
+      appearance: { pressed: '#097' }, labels: { mode: 'note' },
+      overlays: { 62: [{ type: 'badge', text: 'D' }] },
+    });
+    piano.setPressedKeys([0, 61, 127]);
+    const root = svg();
+    const original = root.outerHTML;
+    const black = root.querySelector('[data-note="61"]')!;
+    const label = root.querySelector('[data-layer="labels"] text');
+    const overlay = root.querySelector('[data-layer="overlays"] text');
+    const bounds = () => Array.from(root.querySelectorAll('[data-note]'), node =>
+      ['data-note', 'x', 'y', 'width', 'height'].map(name => node.getAttribute(name)));
+    const before = bounds();
+    piano.setSkin('realistic');
+    expect(svg()).toBe(root);
+    expect(bounds()).toEqual(before);
+    expect(root.querySelector('[data-layer="labels"] text')).toBe(label);
+    expect(root.querySelector('[data-layer="overlays"] text')).toBe(overlay);
+    const edge = black.nextElementSibling!;
+    expect(edge.hasAttribute('data-key-edge')).toBe(true);
+    expect(edge.getAttribute('display')).toBe('none');
+    const indicator = root.querySelector('[data-pressed-indicator][display="inline"]');
+    const observer = new dom.window.MutationObserver(() => {});
+    observer.observe(root, { attributes: true, childList: true, subtree: true });
+    piano.releaseKey(61);
+    expect(edge.getAttribute('display')).toBe('inline');
+    expect(observer.takeRecords().map(record => [record.target, record.attributeName]))
+      .toEqual([[black, 'fill'], [edge, 'display'], [indicator, 'display']]);
+    piano.pressKey(61);
+    expect(edge.getAttribute('display')).toBe('none');
+    expect(black.getAttribute('fill')).toBe('#097');
+    const realistic = root.outerHTML;
+    expect(() => piano.setOptions({ skin: 'minimal', appearance: { black: 'url(#host)' } }))
+      .toThrow(/appearance.black/);
+    expect(root.outerHTML).toBe(realistic);
+    observer.disconnect();
+
+    piano.setOptions({ appearance: { black: 'transparent' } });
+    expect(root.querySelector('linearGradient[id$="-black-edge"]')).toBeNull();
+    expect(root.querySelector('[data-note="63"]')?.getAttribute('fill')).toBe('transparent');
+    expect(root.querySelectorAll('[data-key-edge]')).toHaveLength(1);
+    piano.setOptions({ appearance: { black: undefined } });
+    expect(root.outerHTML).toBe(realistic);
+
+    piano.setSkin('classic');
+    expect(root.outerHTML).toBe(original);
+    expect(piano.getPressedKeys()).toEqual([0, 61, 127]);
+  });
+
+  it('reserves Realistic definitions before skin changes and keeps instance references local', () => {
+    const options = { range: { from: 61, to: 63 }, sizing: { mode: 'fixed' } } as const;
+    const otherHost = dom.window.document.getElementById('other')!;
+    const first = mount(options);
+    const prefix = svg().getAttribute('data-pianorealm-motion')!;
+    const occupied = dom.window.document.createElement('span');
+    occupied.id = prefix.replace(/-1$/, '-2') + '-white-edge';
+    container.append(occupied);
+    const second = mount(options, otherHost);
+    first.setSkin('realistic');
+    second.setSkin('realistic');
+    const ids = Array.from(dom.window.document.querySelectorAll('[id]'), element => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const root of [svg(), svg(otherHost)]) {
+      const references = [...root.outerHTML.matchAll(/url\(#([^)]+)\)/g)];
+      expect(references.some(([, id]) => id.endsWith('-white-edge'))).toBe(true);
+      expect(references.every(([, id]) => root.querySelector(`[id="${id}"]`))).toBe(true);
+    }
+  });
+
   it('switches skins in place and keeps key geometry, off-range notes and targeted updates', () => {
     const piano = mount({ range: { from: 61, to: 65 }, orientation: 'vertical', sizing: { mode: 'fixed' } });
     piano.setPressedKeys([0, 61, 62, 127]);
@@ -1255,7 +1326,12 @@ describe('public hit testing', () => {
     expect(piano.getNoteAtPoint(50, 40)).toBeNull();
     expect(piano.getPressedKeys()).toEqual([]);
     piano.setKeyOverlays({ 61: [{ type: 'text', text: 'annotation' }] });
-    expect(piano.getNoteAtPoint(94, 40)).toBe(61);
+    for (const skin of ['classic', 'realistic', 'modern', 'neon', 'dark', 'high-contrast']) {
+      piano.setSkin(skin);
+      expect(piano.getNoteAtPoint(94, 40)).toBe(61);
+      expect(piano.getNoteAtPoint(94, 140)).toBe(62);
+      expect(piano.getNoteAtPoint(80, 140)).toBeNull();
+    }
   });
 
   it('uses current layout and screen transform after orientation, sizing and range changes', () => {
@@ -1443,7 +1519,7 @@ function contrastRatio(a: string, b: string): number {
 }
 
 describe('release appearance and accessibility', () => {
-  it.each(['minimal', 'classic', 'modern', 'neon', 'dark', 'high-contrast'] as const)(
+  it.each(['minimal', 'classic', 'realistic', 'modern', 'neon', 'dark', 'high-contrast'] as const)(
     'keeps both renderers in parity for %s in both orientations and every pressed mode',
     skin => {
       const options = {

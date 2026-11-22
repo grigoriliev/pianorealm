@@ -195,6 +195,8 @@ Built-in skins from the original specification:
 
 Support an additional **high-contrast accessibility skin** or equivalent documented high-contrast styling mode. Future possibilities: Vintage/Wooden, Educational/Colorful, Skeuomorphic, Monochrome.
 
+The **Realistic** skin adds warm polished keytops, raised charcoal keys, and restrained bevels and contact shadows to mounted and static SVG. [Realistic skin prompt](prompts/01-implementation/photorealistic-piano-skin.md)
+
 Customize key dimensions through the sizing options in §11. Skin tokens control appearance only. Allow appearance overrides for background, white/black colors, borders, radii, shadows, gradients, labels, active state, indicators, and animation. Establish a documented custom-skin registration API. Skins preserve note identities and event semantics.
 
 Keep CSS scoped to the component; avoid global selectors, host resets, global ID collisions and unqualified names. Support transparent, inherited or explicit backgrounds and light/dark host contexts.

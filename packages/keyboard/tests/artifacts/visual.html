@@ -17,6 +17,8 @@
   .compact .mounted, .compact img { width: 128px; height: 98px; }
   .full .mounted { width: 100%; height: 82px; }
   .full img { display: none; }
+  .wide { grid-column: 1 / -1; }
+  .wide .mounted, .wide img { width: calc(50% - 4px); height: 116px; }
 </style>
 <h1>Mounted and static SVG</h1>
 <main></main>
