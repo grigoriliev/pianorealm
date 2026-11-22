@@ -1,7 +1,7 @@
 export { classifyNote, formatNote, normalizeNote } from './notes/notation.js';
 export type { KeyKind, NotationOptions, NoteInput } from './notes/notation.js';
 export { PianoKeyboard } from './public/PianoKeyboard.js';
-export type { KeyboardExtension, KeyboardOptions, KeyboardOptionsPatch } from './public/PianoKeyboard.js';
+export type { KeyboardExtension, KeyboardOptions, KeyboardOptionsPatch, StaticKeyboardOptions } from './public/PianoKeyboard.js';
 export type { KeyboardEventMap } from './public/events.js';
 export type { Orientation } from './config/normalize.js';
 export type { AnimationEasing, AnimationOptions } from './config/animation.js';

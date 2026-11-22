@@ -988,7 +988,8 @@ describe('visual annotations', () => {
     const text = '<&"🎹\r';
     const options = {
       range: { from: 61, to: 63 }, orientation, sizing: { ...fixed, whiteKeyWidth: 34 },
-      skin: 'classic', pressedMode: 'indicator', indicator: { shape: 'square', opacity: 0.8, stroke: '#fff' },
+      skin: 'classic', appearance: { pressed: '#241a52' },
+      pressedMode: 'both', indicator: { shape: 'square', opacity: 0.8, stroke: '#fff' },
       labels: { mode: 'note', custom: { 62: text } },
       highlights: { 62: '#fa0' },
       overlays: { 62: [{ type: 'circle', depth: 0, pitch: 1 }, { type: 'badge', text: 4 }], 63: [{ type: 'number', value: 2 }] },
@@ -997,10 +998,8 @@ describe('visual annotations', () => {
     piano.setPressedKeys([61, 62, 127]);
     piano.setKeyOverlays(options.overlays);
     piano.setOrientation(orientation);
-    const config = normalizeConfig(options);
-    const layout = calculateLayout(config.range, config.orientation, config.sizing);
-    const scene = buildScene(config, layout, config.appearance, new Set(piano.getPressedKeys()));
-    const parsed = new dom.window.DOMParser().parseFromString(serializeScene(scene, scene, 'printed'), 'image/svg+xml').documentElement;
+    const markup = PianoKeyboard.renderToSVG({ ...options, pressedKeys: ['C#4', 'D4', 127], idPrefix: 'printed' });
+    const parsed = new dom.window.DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
     const prefix = svg().getAttribute('data-pianorealm-motion')!;
     const describe = (element: Element, idPrefix: string): unknown => ({
       name: element.localName,

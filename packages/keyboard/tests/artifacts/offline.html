@@ -1,0 +1,138 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline' file:; style-src 'unsafe-inline'; img-src blob: file:">
+<title>Keyboard offline artifact smoke</title>
+<style>
+__CARD_CSS__
+</style>
+<div id="card"></div>
+<div id="independent" style="width: 190px; height: 80px"><p>Host content</p></div>
+<div id="responsive" style="width: 170px; height: 80px; display: none"></div>
+<output id="status">running</output>
+<script>
+const front = __FRONT__;
+const back = __BACK__;
+const status = document.querySelector('#status');
+const blocked = [];
+document.addEventListener('securitypolicyviolation', event => blocked.push(event.blockedURI));
+
+function check(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function until(predicate, message) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (predicate()) return;
+    await new Promise(resolve => requestAnimationFrame(resolve));
+  }
+  throw new Error(message);
+}
+
+function load(src, parent) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => { script.remove(); resolve(); };
+    script.onerror = () => reject(new Error('Failed to load ' + src));
+    parent.appendChild(script);
+  });
+}
+
+async function run() {
+  const sibling = {};
+  globalThis.Pianorealm = { Audio: sibling };
+  const nativeObserver = window.ResizeObserver;
+  let observed = 0;
+  let disconnected = 0;
+  window.ResizeObserver = class extends nativeObserver {
+    observe(...args) { observed++; super.observe(...args); }
+    disconnect() { disconnected++; super.disconnect(); }
+  };
+
+  const stage = document.querySelector('#card');
+  const helper = '_pianorealm-anki-card.js';
+  async function show(template, notes, expected) {
+    stage.innerHTML = template.replace('{{text:Chord}}', notes);
+    await load(stage.querySelector('script').getAttribute('src'), stage);
+    await until(() => stage.querySelectorAll('svg').length === expected, 'Template failed to mount');
+  }
+  await show(front, 'C4 E4 G4', 1);
+  const Keyboard = Pianorealm.Keyboard;
+  check(Pianorealm.Audio === sibling, 'Namespace sibling replaced');
+  check(stage.querySelector('linearGradient') && stage.querySelector('filter'), 'Classic definitions missing');
+  check(stage.querySelectorAll('[data-pressed-indicator][display="inline"]').length === 3, 'Chord markers missing');
+  await load('_pianorealm-keyboard.umd.min.js', document.head);
+  check(Pianorealm.Keyboard === Keyboard, 'Duplicate classic load replaced constructor');
+
+  const independent = document.querySelector('#independent');
+  const ownedByOtherHost = new Keyboard({ container: independent, labels: { mode: 'note' } });
+  ownedByOtherHost.pressKey('A4');
+  const oldSvg = stage.querySelector('svg');
+  stage.classList.add('nightMode');
+  await show(back, 'D4 F4 A4', 2);
+  check(disconnected === 1 && oldSvg.childElementCount > 0 && !oldSvg.isConnected, 'Previous card leaked observation');
+  check(ownedByOtherHost.getPressedKeys().join() === '69', 'Unrelated instance was changed');
+  check(stage.querySelectorAll('svg[aria-label^="Vertical"]').length === 1, 'Vertical back diagram missing');
+  check(stage.querySelectorAll('[data-note][fill="#175d9c"]').length === 6, 'Dark appearance or back chord missing');
+  const first = stage.querySelector('svg');
+  await load(helper, stage);
+  await until(() => stage.querySelector('svg') !== first && stage.querySelectorAll('svg').length === 2, 'Repeated initialization failed');
+  check(disconnected === 2, 'Repeated initialization leaked an observer');
+  check(stage.querySelectorAll('style').length === 2, 'Repeated initialization leaked stylesheet');
+  stage.classList.remove('nightMode');
+  await show(front, '60,64,67', 1);
+  check(disconnected === 3, 'Same-realm navigation leaked an observer');
+  const ids = [...document.querySelectorAll('svg [id]')].map(node => node.id);
+  check(ids.length > 0 && new Set(ids).size === ids.length, 'Live definitions collide');
+  check(!document.querySelector('[tabindex]'), 'Unexpected focusable SVG');
+
+  const responsive = document.querySelector('#responsive');
+  window.ResizeObserver = undefined;
+  const fallback = new Keyboard({
+    container: responsive, orientation: 'vertical', skin: 'classic',
+    range: { from: 'C3', to: 'C5' },
+  });
+  check(!responsive.querySelector('svg'), 'Hidden host unexpectedly has a viewport');
+  responsive.style.display = 'block';
+  fallback.resize();
+  const drawing = responsive.querySelector('svg');
+  check(drawing.getAttribute('width') === '170' && drawing.getAttribute('height') === '80', 'Explicit resize failed');
+  check(matchMedia('(prefers-reduced-motion: reduce)').matches, 'Reduced-motion test preference missing');
+  check(getComputedStyle(drawing.querySelector('[data-note]')).transitionDuration === '0s', 'Reduced motion ignored');
+  fallback.pressKey('C4');
+  fallback.destroy();
+  check(!responsive.hasChildNodes(), 'Destroy left SVG, slot or stylesheet');
+  new Keyboard({ container: responsive, sizing: { mode: 'fixed', width: 86, height: 260 } }).destroy();
+  ownedByOtherHost.destroy();
+  check(independent.children.length === 1 && independent.textContent === 'Host content', 'Host children were changed');
+  check(observed === 5 && disconnected === 4, 'Observer lifecycle mismatch');
+
+  const markup = Keyboard.renderToSVG({
+    range: { from: 'C3', to: 'C5' }, skin: 'classic', idPrefix: 'offline',
+    pressedKeys: ['C4'], overlays: { E4: [{ type: 'circle' }] },
+  });
+  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml');
+  check(parsed.documentElement.localName === 'svg' && parsed.querySelector('clipPath'), 'Static SVG or clip missing');
+  const image = new Image();
+  const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
+  try {
+    image.src = url;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0);
+    check(ctx.getImageData(150, 92, 1, 1).data.join() === '133,80,43,255', 'Offline SVG did not paint pressed fill');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  const resources = performance.getEntriesByType('resource').map(entry => new URL(entry.name));
+  check(resources.every(url => url.protocol === 'file:' || url.protocol === 'blob:'), 'Unexpected remote resource');
+  check(blocked.length === 0, 'Blocked resource: ' + blocked.join(', '));
+}
+run().then(() => { status.textContent = 'PASS'; }, error => {
+  status.textContent = error.message + '\n' + error.stack;
+});
+</script>

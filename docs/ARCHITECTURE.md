@@ -284,7 +284,7 @@ Use the npm scope `@pianorealm/*`. Each published package should ship only the f
 
 ### 9.2 Standalone bundles
 
-For packages needing a classic `<script>` integration, prefer a single global **`Pianorealm`** namespace and package-specific members such as `Pianorealm.Keyboard`. The keyboard specification proposes files such as:
+Packages with classic `<script>` integration share the **`Pianorealm`** namespace. The keyboard classic script installs its constructor at `Pianorealm.Keyboard`. The accepted keyboard artifacts are:
 
 ```text
 pianorealm-keyboard.esm.js
@@ -292,7 +292,7 @@ pianorealm-keyboard.umd.js
 pianorealm-keyboard.umd.min.js
 ```
 
-**Open packaging decision:** exact global export shape, constructor access pattern, coexistence between multiple bundles, and filename commitments must be finalized and smoke-tested. Do not silently overwrite another bundle's `Pianorealm` namespace. Avoid requiring global browser bundles for future packages if their domain does not need them.
+The standalone installer preserves sibling properties and reuses a constructor when the package and version match. Incompatible bindings raise an error. Future packages opt in to standalone distribution. [Accepted namespace and collision policy](decisions/0002-standalone-global-namespace.md)
 
 ### 9.3 CSS and asset isolation
 

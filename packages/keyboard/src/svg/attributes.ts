@@ -11,6 +11,13 @@ export interface Viewport {
   readonly height: number;
 }
 
+export function fixedViewport(intrinsicSize: Viewport, sizing: Partial<Viewport>): Viewport {
+  return {
+    width: sizing.width ?? intrinsicSize.width,
+    height: sizing.height ?? intrinsicSize.height,
+  };
+}
+
 export function viewportAttributes({ width, height }: Viewport) {
   if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
     throw new RangeError('SVG viewport dimensions must be positive and finite');
@@ -19,7 +26,7 @@ export function viewportAttributes({ width, height }: Viewport) {
 }
 
 // Only these closed attribute sets are materialized by the output adapters.
-// Property order defines the prototype serializer's attribute order.
+// Property order defines the serializer's attribute order.
 export function rootAttributes(scene: KeyboardScene) {
   return {
     viewBox: `0 0 ${scene.width} ${scene.height}`,

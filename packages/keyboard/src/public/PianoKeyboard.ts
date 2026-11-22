@@ -8,10 +8,12 @@ import { normalizeNote } from '../notes/notation.js';
 import type { NoteInput } from '../notes/notation.js';
 import { buildScene } from '../scene/build-scene.js';
 import { findSkin, normalizeAppearance } from '../skins/appearance.js';
-import type { AppearanceOptions } from '../skins/appearance.js';
+import type { AppearanceOptions, BuiltInSkin } from '../skins/appearance.js';
 import { PressedKeys } from '../state/pressed-keys.js';
-import { MountedSvg, validateContainer } from '../svg/mount.js';
+import { fixedViewport } from '../svg/attributes.js';
 import type { Viewport } from '../svg/attributes.js';
+import { MountedSvg, validateContainer } from '../svg/mount.js';
+import { serializeScene } from '../svg/serialize.js';
 import { KeyboardEvents } from './events.js';
 import type { KeyboardEventMap } from './events.js';
 
@@ -28,13 +30,34 @@ export interface KeyboardOptions extends KeyboardOptionsPatch {
   readonly onCallbackError?: (error: unknown) => void;
 }
 
+export interface StaticKeyboardOptions extends Omit<ConfigOptions, 'animation' | 'sizing' | 'skin'> {
+  readonly sizing?: (Omit<NonNullable<ConfigOptions['sizing']>, 'mode'> & {
+    readonly mode?: 'fixed' | undefined;
+  }) | undefined;
+  readonly skin?: BuiltInSkin | undefined;
+  readonly pressedKeys?: readonly NoteInput[] | undefined;
+  readonly idPrefix?: string | undefined;
+}
+
 /** Synchronously set up a visualization extension and optionally return its cleanup. */
 export type KeyboardExtension = (keyboard: PianoKeyboard) => void | (() => void);
 
 const OPTION_FIELDS = ['container', 'onCallbackError', ...CONFIG_FIELDS];
+const STATIC_FIELDS = [...CONFIG_FIELDS.filter(field => field !== 'animation'), 'pressedKeys', 'idPrefix'];
+const STATIC_DEFAULTS = normalizeConfig({ sizing: { mode: 'fixed' } });
 
 function layoutFor(config: ReturnType<typeof normalizeConfig>) {
   return calculateLayout(config.range, config.orientation, config.sizing);
+}
+
+function normalizePressedKeys(keys: readonly NoteInput[], notation: ReturnType<typeof normalizeConfig>['notation']): Set<number> {
+  if (!Array.isArray(keys)) throw new TypeError('Pressed keys must be an array of notes');
+  const notes = new Set<number>();
+  const count = keys.length;
+  for (let index = 0; index < count; index++) {
+    notes.add(normalizeNote(keys[index], notation));
+  }
+  return notes;
 }
 
 /** A display-only piano keyboard mounted in a caller-provided HTML element. */
@@ -46,6 +69,20 @@ export class PianoKeyboard {
   readonly #pressed = new PressedKeys();
   readonly #events: KeyboardEvents;
   readonly #extensionDisposers = new Set<() => void>();
+
+  /** Render the final visual state to standalone SVG without mounting a keyboard. */
+  static renderToSVG(options: StaticKeyboardOptions = {}): string {
+    validateRecord(options, STATIC_FIELDS, 'static keyboard options');
+    const { pressedKeys = [], idPrefix, ...configOptions } = options;
+    // Omission keeps the static defaults. The shared reset uses the mounted defaults.
+    if (configOptions.sizing === undefined) delete configOptions.sizing;
+    const config = normalizeConfig(configOptions, STATIC_DEFAULTS);
+    if (config.sizing.mode !== 'fixed') throw new TypeError('Static SVG requires fixed sizing');
+    const pressed = normalizePressedKeys(pressedKeys, config.notation);
+    const layout = layoutFor(config);
+    const scene = buildScene(config, layout, config.appearance, pressed);
+    return serializeScene(scene, fixedViewport(layout, config.sizing), idPrefix);
+  }
 
   constructor(options: KeyboardOptions) {
     validateRecord(options, OPTION_FIELDS, 'keyboard options');
@@ -101,15 +138,7 @@ export class PianoKeyboard {
   /** Atomically replace the visually pressed notes, including those outside the displayed range. */
   setPressedKeys(keys: readonly NoteInput[]): void {
     const mount = this.#requireMutableMount();
-    if (!Array.isArray(keys)) {
-      throw new TypeError('Pressed keys must be an array of notes');
-    }
-    const notes = new Set<number>();
-    const count = keys.length;
-    for (let index = 0; index < count; index++) {
-      notes.add(normalizeNote(keys[index], this.#config.notation));
-    }
-    const changed = this.#pressed.replace(notes);
+    const changed = this.#pressed.replace(normalizePressedKeys(keys, this.#config.notation));
     for (const note of changed) {
       mount.setKeyPressed(note, this.#pressed.has(note));
     }

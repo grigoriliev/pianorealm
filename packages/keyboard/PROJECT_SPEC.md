@@ -144,7 +144,7 @@ For pressed-state changes, update affected SVG elements where practical; do not 
 Provide:
 
 ```ts
-PianoKeyboard.renderToSVG(options): string;
+PianoKeyboard.renderToSVG(options?: StaticKeyboardOptions): string;
 ```
 
 Requirements:
@@ -341,7 +341,7 @@ Anki is an important deployment target, **not** an architectural dependency.
 
 ### Standalone build
 
-Provide a classic-script-compatible standalone browser bundle with one documented global namespace. Target distribution artifact names, subject to build configuration, are:
+Provide ESM and a standalone classic script under the accepted artifact names:
 
 - `pianorealm-keyboard.esm.js`
 - `pianorealm-keyboard.umd.js`
@@ -349,21 +349,7 @@ Provide a classic-script-compatible standalone browser bundle with one documente
 
 The standalone build must include all required runtime code and styling, need no module loader or internet connection, and avoid excessive global namespace pollution.
 
-**Global API decision:** Prefer `Pianorealm.Keyboard` (a namespaced ecosystem global) rather than a bare global `PianoKeyboard`; finalize this in Phase 0 and ensure examples match the actual bundle export. A possible classic-script usage shape is:
-
-```html
-<script src="_pianorealm-keyboard.umd.min.js"></script>
-<script>
-  const Keyboard = window.Pianorealm.Keyboard;
-  const piano = new Keyboard({
-    container: document.querySelector('.piano'),
-    range: { from: 'C3', to: 'C5' },
-    skin: 'classic'
-  });
-</script>
-```
-
-This example is **proposed API**, not a claim of existing Anki-compatible output; exact media filename, namespace and template lifecycle handling must be verified in tested clients.
+The classic script installs the constructor at `Pianorealm.Keyboard`. [Distribution ADR](../../docs/decisions/0002-standalone-global-namespace.md) · [Classic-script example](README.md#use-a-standalone-classic-script)
 
 ### Runtime compatibility
 
@@ -378,7 +364,7 @@ This example is **proposed API**, not a claim of existing Anki-compatible output
 
 ### Anki documentation
 
-Provide copy-and-paste front/back examples, instructions for placing media files in `collection.media`, script references, initialization, state display, both orientations, night mode, and card lifecycle limitations. Clearly distinguish **live JavaScript** from **pre-rendered static SVG** workflows.
+Provide copy-and-paste front/back examples, instructions for placing media files in `collection.media`, script references, initialization, state display, both orientations, night mode, and card lifecycle limitations. Clearly distinguish **live JavaScript** from **pre-rendered static SVG** workflows. [Anki guide and compatibility matrix](docs/guides/anki-integration.md)
 
 ## 17. Testing and quality gates
 

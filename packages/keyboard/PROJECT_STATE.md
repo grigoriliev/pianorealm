@@ -1,6 +1,6 @@
 # `@pianorealm/keyboard` — Project State
 
-> **Status:** Implementation · **Last completed phase:** Phase 8 · **Phase 9:** Pending
+> **Status:** Implementation · **Last completed phase:** Phase 8 · **Phase 9:** In progress, Anki Desktop Linux verified
 > **Last verified:** 2026-11-22 · **Maintainer:** Project contributors
 
 ## Completion and implementation decisions
@@ -11,6 +11,37 @@
 - Internal configuration returns a frozen snapshot after validation. A patch replaces the range as a pair, merges declared notation and sizing fields, and uses explicit `undefined` to reset values. Patched notation applies to new range names. Existing MIDI endpoints retain their identity. Dimensions live under sizing. Defaults are horizontal, MIDI 21–108, container sizing, and white/black pitch widths and depths of 20 × 100 and 12 × 60. [Note and configuration ADR](docs/decisions/0001-notes-configuration-and-state.md) · [Layout and sizing ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
+
+## Phase 9 handoff
+
+- The public `PianoKeyboard.renderToSVG(options?: StaticKeyboardOptions)` in `src/public/PianoKeyboard.ts` shares configuration, pressed-note normalization, intrinsic layout, fixed viewport resolution, and the scene with mounted SVG. It uses built-in skins and inline appearance tokens, then serializes the final scene without browser APIs. The package root exports the options type. The serializer's explicit-prefix validation and per-copy default allocator continue to isolate definition IDs. [Static API and embedding](README.md#generate-static-svg)
+- `vite.config.ts` builds `pianorealm-keyboard.esm.js` and separate `pianorealm-keyboard.umd.js` and `pianorealm-keyboard.umd.min.js` IIFEs. The classic-only installer in `src/standalone.ts` uses the manifest version and a stable own marker. It preserves namespace siblings and rejects conflicting bindings. The accepted ADR supersedes earlier Phase 0 wording that described the global and filenames as open. [Standalone policy](../../docs/decisions/0002-standalone-global-namespace.md)
+- `tests/integration/mount.test.ts` compares the public SVG output to the mounted final state in both orientations after normalizing definition prefixes and excluding the namespace declaration and motion-scope attribute. `tests/artifacts/` checks the built distribution, parsed XML, accessible names and overlays, the isolated declaration consumer, global collisions, and Firefox lifecycle and offline rendering.
+- The Anki guide includes horizontal and vertical templates, a local card helper that disposes template-owned instances, theme selection, static SVG media, and a client test checklist. The existing demo remains available. The guide's Firefox fixture uses substituted note text and ordinary local browser script loading. [Anki guide and compatibility matrix](docs/guides/anki-integration.md)
+
+### Verification
+
+Run from `packages/keyboard` with Node 24.22.1, npm 11.19.1, TypeScript 5.9.3, Vitest 4.1.12, and Vite 7.3.8. The Firefox check uses Python 3.13.5.
+
+| Command | Observed result |
+| --- | --- |
+| `npm run typecheck && npm test && npm run build` before edits | Passed. 263 tests across eight files verified the Phase 8 baseline, including events, hit testing, and extension cleanup. The ESM and declaration build passed. |
+| `npm run typecheck && npm test && npm run build && npm run test:artifacts` | Exit 0. Typecheck passed, all 263 tests across eight files passed, and the build emitted all three named artifacts, sourcemaps and ESM declarations. All 15 artifact checks passed, including an isolated external ES2022-only declaration consumer and Node import/render with browser-global accessors that throw. |
+| `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 tests/artifacts/firefox-offline.py` | Both classic artifacts passed in headless Firefox 160.0.1. Marionette used local loopback automation. Firefox loaded only fixture-local media with its network service offline and CSP blocking remote resources. Verified chord and theme updates, duplicate load, same-realm remount, separate instances, observer cleanup, hidden-host resize fallback, reduced motion, and rasterized static SVG. The default sandbox blocked the loopback socket. |
+| `git diff --check` and `git status --short --untracked-files=all` from the repository root | Whitespace check passed. The pre-existing untracked `packages/keyboard/.gitignore` was preserved. Build artifacts are ignored. |
+
+### Anki Desktop checklist
+
+On 2026-11-22, the official Anki Desktop 26.09.3 client passed the checklist on Debian 13.8 x86-64. Its WebView reported QtWebEngine 6.11.2 and Chromium 140. A temporary profile add-on drove Anki's Cards preview and normal reviewer and inspected the live WebView. `unshare --map-root-user --net /tmp/pianorealm-anki26/run.sh` exited 0 and the local assertion log at `/tmp/pianorealm-anki26/report.jsonl` ended in `PASS`. The client ran offscreen with only the loopback interface and no external routes, so the client could serve local media during offline review. [Anki release](https://github.com/ankitects/anki/releases/tag/26.09.3)
+
+| Check | Observed result |
+| --- | --- |
+| Media and preview | With the media in place, Anki's media checker reported 0 missing and 0 unused files. Preview showed one horizontal keyboard on the front and one vertical and one horizontal keyboard on the back, each marking MIDI 60, 64, and 67. |
+| Review and lifecycle | The reviewer flipped and advanced from C4/E4/G4 to D4/F4/A4 in the same WebView realm. Leaving review, undoing the rating, and re-entering returned to the first chord. There was one SVG per host, and all Classic definition IDs were unique within the rendered card. |
+| Theme and sizing | Light mode used Classic gradients. Night mode selected Minimal with the guide's pressed color and visible shape markers. The horizontal viewport resized from 300 × 100 to 210 × 100 on both sides. The vertical viewport stayed at its configured 92 × 276. |
+| Static and diagnostics | The scriptless templates displayed the 240 × 80 media image with the expected pressed-key pixel and an inline SVG with three visible markers. Withholding the bundle and entering an invalid note separately produced the expected messages. Restoring the bundle restored preview rendering. |
+
+Media sync and other Anki clients, versions, and platforms remain unverified. Assistive technologies and the Node 22 development baseline remain untested in this phase. Phase 9 stays in progress for the remaining client coverage. [Compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
 
 ## Phase 8 handoff
 
@@ -299,8 +330,8 @@ From the repository root, `git diff --check` passed and `git status --short --un
 - Phase 3 browser evidence covers the headless Firefox fixture. Other browsers and webviews, screen-reader behavior, the Node 22 development baseline, and Anki clients remain untested. The temporary Firefox fixture is outside the repository. The README includes a repeatable manual fitting and lifecycle check.
 - Firefox 160.0.1 was the only real browser checked for Phases 5 and 6. The Phase 6 smoke adds browser evidence for mode switching. Observer setup rollback is covered by DOM integration tests. Other browsers, assistive technologies and Anki clients remain unverified.
 - Classic gradient-to-solid changes apply immediately. Hosts without ResizeObserver need explicit `resize()` after layout changes. Hosts without the reduced-motion CSS feature show the stable final state.
-- The public static SVG API, inline static skins, classic-script output and Anki verification remain Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS, optional public key bounds, and registration of custom overlay types remain deferred.
+- Anki Desktop Linux has one verified client version. The remaining client matrix is Phase 9 work. Additional skins, the high-contrast strategy and the full playground are tracked in Phase 10. CommonJS, optional public key bounds, and registration of custom overlay types remain deferred.
 
 ## Next task
 
-Phase 9 is pending. Start by matching the public `PianoKeyboard.renderToSVG()` options to the existing private serializer. Review fixed and intrinsic viewport defaults, inline skin tokens, and the explicit ID prefix contract before exposing the API, then verify it from a Node consumer without DOM globals. Standalone packaging and Anki validation follow that API task. [Phase 9 plan](DEVELOPMENT_PLAN.md#14-phase-9--static-svg-offline-bundles-and-anki-integration) · [Shared scene ADR](docs/decisions/0003-scene-safe-svg-and-identifiers.md) · [Standalone bundle ADR](../../docs/decisions/0002-standalone-global-namespace.md)
+Repeat the checklist in an available Windows or macOS Anki Desktop test profile, then extend the matrix to mobile and AnkiWeb as environments become available. [Anki test checklist](docs/guides/anki-integration.md#test-on-each-client)

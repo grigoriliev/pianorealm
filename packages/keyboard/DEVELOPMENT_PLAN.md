@@ -81,7 +81,7 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 | **6** | Sizing and motion | 5 | Container/fixed sizing, reduced motion, cleanup | Complete |
 | **7** | Labels, indicators, overlays | 6 | Layered, safe configurable visual annotations | Complete |
 | **8** | Events, hit testing, extensions | 7 | Typed composition points without input coupling | Complete |
-| **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | Not started |
+| **9** | Static SVG, standalone builds, Anki | 8 + early shared-scene work | Self-contained output and embedded smoke tests | In progress, Anki client checks pending |
 | **10** | Release hardening and publication prep | 1–9 | Complete release gates, docs, playground, QA | Not started |
 
 **Critical sequencing qualification:** Design static output, Anki compatibility, and hit-testing during **Phase 0**; establish shared scene abstractions in **Phase 3**. Phase 9 completes and verifies these capabilities—it must not require replacing the core renderer. Release tooling may be scaffolded in Phase 1; full packaging verification happens in Phases 9–10.
@@ -241,16 +241,18 @@ Status values: **Not started / In progress / Blocked / Complete / Deferred**. Ch
 
 **Tasks**
 
-- [ ] Implement `PianoKeyboard.renderToSVG(options)` with **no DOM requirement**, sharing geometry, scene, skin, and annotation logic with the mounted renderer.
-- [ ] Include self-contained styles/definitions, safe escaping, unique/collision-resistant SVG IDs, and deterministic behavior where promised.
-- [ ] Test generated output in Node.js (if supported) and in browsers; compare static and mounted representations for representative fixtures.
-- [ ] Produce ESM and standalone classic-script/UMD variants, including minified build, self-contained runtime assets and tested namespace preservation (proposed `Pianorealm.Keyboard`; exact API is an ADR).
-- [ ] Add smoke tests for imports, global exposure, coexisting instances, offline execution, and absence of network dependency.
-- [ ] Write an Anki guide: media-file deployment, front/back card templates, horizontal/vertical initialization, state updates, night mode, multiple instances, and safe reinitialization.
+- [x] Implement `PianoKeyboard.renderToSVG(options)` with **no DOM requirement**, sharing geometry, scene, skin, and annotation logic with the mounted renderer.
+- [x] Include self-contained styles/definitions, safe escaping, unique/collision-resistant SVG IDs, and deterministic behavior where promised.
+- [x] Test generated output in Node.js and Firefox and compare static and mounted representations for representative fixtures.
+- [x] Produce ESM and standalone classic-script variants, including a minified build and tested `Pianorealm.Keyboard` installation. [Distribution ADR](../../docs/decisions/0002-standalone-global-namespace.md)
+- [x] Add smoke tests for imports, global exposure, coexisting instances, offline execution, and absence of network dependency.
+- [x] Write an Anki guide covering media-file deployment, front/back card templates, horizontal/vertical initialization, state updates, night mode, multiple instances, and safe reinitialization.
 - [ ] Test Anki Desktop and mobile clients **where environments are actually available**; record version, OS, evidence, limitations, and untested clients separately. Include AnkiWeb if accessible and feasible.
-- [ ] Document embedded API fallbacks and behavior without `ResizeObserver` or other optional browser features.
+- [x] Document embedded API fallbacks and behavior without `ResizeObserver` or other optional browser features.
 
 **Gate:** Static SVG is genuinely self-contained, standalone builds load without a module loader/network, and compatibility claims match verified environments.
+
+Static SVG and distribution checks passed. Actual-client verification is pending. [Phase 9 handoff](PROJECT_STATE.md#phase-9-handoff) · [Anki compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
 
 ## 15. Phase 10 — Release quality, developer experience, and publication prep
 

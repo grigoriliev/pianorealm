@@ -18,7 +18,8 @@
     "dev:demo": "vite --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "vite build && tsc -p tsconfig.build.json"
+    "build": "vite build && vite build --mode standalone && vite build --mode standalone-min && tsc -p tsconfig.build.json",
+    "test:artifacts": "node tests/artifacts/distribution.mjs"
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.7",

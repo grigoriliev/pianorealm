@@ -2,6 +2,7 @@ import type { ResolvedAnimation } from '../config/animation.js';
 import { keyPresentation } from '../scene/build-scene.js';
 import type { KeyboardScene } from '../scene/build-scene.js';
 import type { Viewport } from './attributes.js';
+import { fixedViewport } from './attributes.js';
 import { buildSvg, sizeSvg, updateKeyPresentation, updateSvg } from './dom-renderer.js';
 import { reserveLivePrefix } from './identifiers.js';
 import { measureContainer } from './measure.js';
@@ -150,10 +151,7 @@ export class MountedSvg {
     if (sizing.mode === 'container') {
       return measureContainer(this.#container);
     }
-    return {
-      width: sizing.width ?? intrinsicSize.width,
-      height: sizing.height ?? intrinsicSize.height,
-    };
+    return fixedViewport(intrinsicSize, sizing);
   }
 
   updateSizing(sizing: MountSizing, scene?: KeyboardScene): void {

@@ -1,6 +1,6 @@
 # @pianorealm/keyboard
 
-The Pianorealm keyboard package renders a display-only piano as SVG. The private package provides an ESM entry with TypeScript declarations for the mounted keyboard and note utilities. [Project state](PROJECT_STATE.md)
+The Pianorealm keyboard package renders a display-only piano as SVG. It provides the mounted keyboard, a DOM-free SVG generator, and note utilities through ESM with TypeScript declarations. Standalone classic scripts run offline. [Project state](PROJECT_STATE.md)
 
 ## Development
 
@@ -11,13 +11,59 @@ npm ci
 npm run typecheck
 npm test
 npm run build
+npm run test:artifacts
 ```
 
-The build generates `dist/pianorealm-keyboard.esm.js` and `dist/index.d.ts`. From the package directory, verify the built package entry with:
+The build generates `dist/pianorealm-keyboard.esm.js`, `dist/index.d.ts`, `dist/pianorealm-keyboard.umd.js`, and `dist/pianorealm-keyboard.umd.min.js`. The package-root import `@pianorealm/keyboard` uses ESM and its declarations. From the package directory, verify the built package entry with:
 
 ```sh
 node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard"; console.log(normalizeNote("C4"))'
 ```
+
+To repeat the offline smoke test with Python 3 and Firefox, run `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 tests/artifacts/firefox-offline.py`. It creates a temporary Firefox profile and uses loopback for browser automation. Firefox loads the fixture and both scripts from local files with its network service offline.
+
+## Generate static SVG
+
+```ts
+import { PianoKeyboard } from '@pianorealm/keyboard';
+import type { StaticKeyboardOptions } from '@pianorealm/keyboard';
+
+const options: StaticKeyboardOptions = {
+  range: { from: 'C3', to: 'C5' },
+  orientation: 'horizontal',
+  skin: 'classic',
+  sizing: { width: 300, height: 100 },
+  pressedKeys: ['C4', 'E4', 'G4'],
+  idPrefix: 'chart-c-major',
+};
+const svg = PianoKeyboard.renderToSVG(options);
+```
+
+`renderToSVG(options?)` works in Node without a DOM and in modern browsers. It takes the normal range, notation, orientation, key dimensions, appearance, labels, highlights, indicators and overlays. Use a built-in skin and inline `appearance` tokens to customize static paint. The static options describe final state and accept only fixed sizing. Each omitted viewport axis uses the oriented intrinsic dimension. With no options the result is a horizontal Minimal keyboard spanning A0–C8. The mounted and static APIs share note normalization and validation. Pressed notes may use MIDI integers or note names, and only visible notes are drawn. Invalid options throw without modifying the input.
+
+The SVG includes an XML namespace, dimensions, a `viewBox`, an accessible image name, and any gradients, shadows or clips it uses. It needs no runtime JavaScript, stylesheets, or remote assets. Add accompanying text where the selection or annotations carry meaning, or supply equivalent alt text when using an image element. Mounted and static output share the same final-state scene. Parity tests normalize definition prefixes and ignore the XML namespace declaration and mount-only motion scope.
+
+An explicit `idPrefix` must start with an ASCII letter, followed by up to 63 ASCII letters, digits, hyphens or underscores. Identical normalized inputs and an explicit prefix produce identical bytes. Default prefixes isolate generated definitions within one loaded library copy. Assign distinct prefixes when embedding inline SVGs from independent library copies or processes, or when repeating a diagram in the same document. To reuse the exact SVG bytes, embed each occurrence as a separate image.
+
+## Use a standalone classic script
+
+Place either `pianorealm-keyboard.umd.js` or `pianorealm-keyboard.umd.min.js` next to the page. Both have the same global API and bundle all runtime code and styling. Mounting requires a browser with a DOM, SVG and modern JavaScript (ES2022). See the [Anki integration guide](docs/guides/anki-integration.md) for local media, card templates, theme selection, and client verification status.
+
+```html
+<div id="piano"></div>
+<script src="./pianorealm-keyboard.umd.min.js"></script>
+<script>
+  const piano = new Pianorealm.Keyboard({
+    container: document.getElementById('piano'),
+    range: { from: 'C3', to: 'C5' },
+    sizing: { mode: 'fixed', width: 300, height: 100 },
+  });
+  piano.setPressedKeys(['C4', 'E4', 'G4']);
+  // Call piano.destroy() when the host is disposed.
+</script>
+```
+
+The classic entry installs `globalThis.Pianorealm.Keyboard`, including `renderToSVG()`. It creates an absent namespace, preserves existing sibling properties, and reuses the constructor when the same package version is already installed. An incompatible namespace, a differently versioned or unrecognized `Keyboard` binding, or a blocked installation raises an error and preserves the existing bindings. The `.umd.js` filenames identify self-contained browser scripts built as IIFEs. The package-root types describe the ESM API.
 
 ## Development demo
 
@@ -127,7 +173,7 @@ Resolution starts with Minimal defaults, applies the selected skin's tokens, and
 
 Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unknown names and fields, unsupported paint syntax and malformed tokens throw `TypeError`. Out-of-range numeric tokens throw `RangeError`. The root exports `BuiltInSkin`, `AppearanceOptions`, `AppearanceColor`, `KeyPaint`, `KeyGradient` and `GradientStop`.
 
-Gradient and shadow definitions travel with the SVG and use instance-specific IDs. The public static SVG API and its inline custom-skin options are scheduled for Phase 9.
+Gradient and shadow definitions travel with the SVG and use instance-specific IDs. Static diagrams select a built-in skin and apply inline appearance options. [Generate static SVG](#generate-static-svg)
 
 ## Labels, highlights, and overlays
 

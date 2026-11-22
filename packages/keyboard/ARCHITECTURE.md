@@ -256,7 +256,7 @@ The scene represents stable key identities, geometry, style, labels, indicators,
 - Escape all untrusted text and attribute values; reject unsupported SVG payloads rather than injecting raw markup unsafely.
 - Avoid global CSS, external fonts/images/stylesheets, and network requests.
 - Define a stable strategy for SVG `<defs>` identifiers so separately embedded instances do not collide.
-- Yield deterministic output for identical inputs under the [accepted ID policy](docs/decisions/0003-scene-safe-svg-and-identifiers.md). The private serializer already accepts a validated `idPrefix` for stable output. The public static entry point is Phase 9 work.
+- Yield deterministic output for identical normalized inputs and an explicit validated `idPrefix`. Default prefixes isolate definitions within one library copy. [Identifier policy](docs/decisions/0003-scene-safe-svg-and-identifiers.md)
 
 **Static SVG has no browser animation or events.** It should show the requested visual end state. Node-compatible generation is the preferred target and should be verified with a Node smoke test.
 
@@ -334,7 +334,7 @@ class PianoKeyboard {
   setOptions(options: KeyboardOptionsPatch): void;
   resize(): void;
   destroy(): void;
-  static renderToSVG(options: StaticKeyboardOptions): string;
+  static renderToSVG(options?: StaticKeyboardOptions): string;
 }
 ```
 
@@ -390,7 +390,7 @@ pianorealm-keyboard.umd.min.js      minified standalone bundle
 Pianorealm.Keyboard                proposed browser global
 ```
 
-Bundle filenames, exports map, exact global shape, and whether CommonJS is justified **remain Phase 0 decisions**. The standalone bundle must work offline without external runtime dependencies; ensure it does not overwrite other `Pianorealm` namespace members. Export a self-contained static SVG path when scripting is undesirable. Verify actual Anki template and night-mode behavior on named client versions; do not label untested clients supported.
+The package root exports ESM and declarations. Both standalone artifacts install `Pianorealm.Keyboard` through the explicit installer and preserve other namespace members. The standalone artifacts use a self-contained classic script. [Accepted distribution contract](../../docs/decisions/0002-standalone-global-namespace.md) · [Anki client verification](docs/guides/anki-integration.md#compatibility-matrix)
 
 ## 15. Testing strategy and quality gates
 
