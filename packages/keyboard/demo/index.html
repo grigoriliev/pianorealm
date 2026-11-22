@@ -84,8 +84,16 @@
                 <option value="indicator">Indicator only</option>
               </select>
             </label>
-            <label><input id="override-pressed-color" type="checkbox"> Override pressed color</label>
-            <label>Pressed key color <input id="pressed-color" type="color" value="#5582ad" disabled></label>
+            <label>Pressed colors
+              <select id="pressed-color-mode">
+                <option value="default">Skin defaults</option>
+                <option value="shared">Shared color</option>
+                <option value="separate">Separate colors</option>
+              </select>
+            </label>
+            <label hidden>Pressed key color <input id="pressed-color" type="color" value="#5582ad"></label>
+            <label hidden>White-key pressed color <input id="pressed-white" type="color" value="#5582ad"></label>
+            <label hidden>Black-key pressed color <input id="pressed-black" type="color" value="#306997"></label>
             <label>Indicator shape
               <select id="indicator-shape">
                 <option value="circle">Circle</option>

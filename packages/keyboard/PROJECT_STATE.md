@@ -14,6 +14,13 @@
 
 ## Playground pressed-color preview
 
+- The playground offers **Skin defaults**, **Shared color**, and **Separate colors**. `AppearanceOptions.pressedWhite` and `pressedBlack` let callers override either key type independently in mounted keyboards, registered skins and static SVG. Shared `pressed` remains available, and the selected fill uses the existing pressed-mode and Realistic edge-lighting rules.
+- `npm run typecheck && npm run build && npm test` passed type checking and all builds. Vitest passed 274 of 278 tests, including all four added cases. The pre-edit `npm run typecheck && npm test` run passed 270 of 274 tests and reported the same four failures. Two expectations still refer to Classic's earlier fill. The other two measure the committed Classic and Realistic pressed colors below the 4.5:1 threshold against white. The built-in palettes were preserved.
+- The focused Firefox 160.0.1 playground check in `tests/artifacts/firefox-release.py` passed with local loopback. It verified shared and separate fills, resetting to the skin defaults, indicator mode, and independently colored keys in the generated static SVG. Full visual baselines were outside this check. `git diff --check` passed.
+- The next bounded verification task is to review the Classic and Realistic pressed palettes against the existing contrast target before rerunning the full visual regression.
+
+### Earlier shared-color picker
+
 - **Override pressed color** enables a live picker for the pressed fill in all playground previews. The mounted and static snippets and SVG downloads carry the override. Clearing the checkbox restores the selected skin's default.
 - `npm run typecheck` and `npm run build` passed. The Firefox 160.0.1 playground check in `tests/artifacts/firefox-release.py` passed when run directly with local loopback. It exercised live color updates, restoration of the skin default, and the generated static options. `npm test` passed 273 of 274 tests. The committed Realistic pressed palette (`#5582ad`) yields 4.05:1 against white, below the existing 4.5:1 test threshold. The earlier Realistic evidence below applies to its original palette.
 - The next bounded verification task is to review the committed Realistic palette against the contrast target, then rerun the full test suite and visual regression.

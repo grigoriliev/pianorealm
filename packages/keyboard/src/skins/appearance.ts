@@ -24,6 +24,8 @@ export interface AppearanceOptions {
   readonly strokeWidth?: number | undefined;
   readonly cornerRadius?: number | undefined;
   readonly pressed?: AppearanceColor | undefined;
+  readonly pressedWhite?: AppearanceColor | undefined;
+  readonly pressedBlack?: AppearanceColor | undefined;
   readonly blackKeyShadow?: number | undefined;
 }
 
@@ -31,10 +33,14 @@ type SkinAppearance = AppearanceOptions & {
   readonly edgeLighting?: Readonly<Record<KeyKind, KeyGradient>>;
 };
 
+type PressedColorField = 'pressedWhite' | 'pressedBlack';
+
 export type ResolvedAppearance = {
-  readonly [Field in keyof AppearanceOptions]-?: NonNullable<AppearanceOptions[Field]>;
-} & {
-  readonly edgeLighting?: Readonly<Record<KeyKind, KeyGradient | undefined> & { pressed: boolean }>;
+  readonly [Field in Exclude<keyof AppearanceOptions, PressedColorField>]-?: NonNullable<AppearanceOptions[Field]>;
+} & Pick<AppearanceOptions, PressedColorField> & {
+  readonly edgeLighting?: Readonly<Record<KeyKind, KeyGradient | undefined> & {
+    pressed: Readonly<Record<KeyKind, boolean>>;
+  }>;
 };
 
 export const minimalAppearance = Object.freeze({
@@ -47,6 +53,8 @@ export const minimalAppearance = Object.freeze({
   pressed: '#3978bd',
   blackKeyShadow: 0,
 } satisfies ResolvedAppearance);
+
+const appearanceFields = [...Object.keys(minimalAppearance), 'pressedWhite', 'pressedBlack'];
 
 const classic = normalizeAppearance({
   background: '#332922',
@@ -173,7 +181,7 @@ function gradient(value: unknown, field: string): KeyGradient {
 export function normalizeAppearance(
   patch: AppearanceOptions, previous: AppearanceOptions = {},
 ): AppearanceOptions {
-  validateRecord(patch, Object.keys(minimalAppearance), 'appearance');
+  validateRecord(patch, appearanceFields, 'appearance');
   const result: { -readonly [K in keyof AppearanceOptions]: AppearanceOptions[K] } = { ...previous };
   for (const field of Object.keys(patch) as (keyof AppearanceOptions)[]) {
     const value = patch[field];
@@ -193,10 +201,15 @@ export function normalizeAppearance(
 
 export function resolveAppearance(skin: SkinAppearance, overrides: AppearanceOptions): ResolvedAppearance {
   const selected = { ...skin, ...overrides };
+  const pressedWhite = overrides.pressedWhite ?? (overrides.pressed === undefined ? skin.pressedWhite : undefined);
+  const pressedBlack = overrides.pressedBlack ?? (overrides.pressed === undefined ? skin.pressedBlack : undefined);
   const edgeLighting = skin.edgeLighting && Object.freeze({
     white: overrides.white === undefined ? skin.edgeLighting.white : undefined,
     black: overrides.black === undefined ? skin.edgeLighting.black : undefined,
-    pressed: overrides.pressed === undefined,
+    pressed: Object.freeze({
+      white: overrides.pressed === undefined && overrides.pressedWhite === undefined,
+      black: overrides.pressed === undefined && overrides.pressedBlack === undefined,
+    }),
   });
   return Object.freeze({
     background: selected.background ?? minimalAppearance.background,
@@ -206,6 +219,8 @@ export function resolveAppearance(skin: SkinAppearance, overrides: AppearanceOpt
     strokeWidth: selected.strokeWidth ?? minimalAppearance.strokeWidth,
     cornerRadius: selected.cornerRadius ?? minimalAppearance.cornerRadius,
     pressed: selected.pressed ?? minimalAppearance.pressed,
+    ...(pressedWhite === undefined ? {} : { pressedWhite }),
+    ...(pressedBlack === undefined ? {} : { pressedBlack }),
     blackKeyShadow: selected.blackKeyShadow ?? minimalAppearance.blackKeyShadow,
     ...(edgeLighting && { edgeLighting }),
   });

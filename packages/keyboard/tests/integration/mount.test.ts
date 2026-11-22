@@ -510,6 +510,44 @@ describe('programmatic pressed keys', () => {
 });
 
 describe('mounted appearance', () => {
+  it('applies independent pressed fills and Realistic lighting to the mounted and static keys', () => {
+    const options = {
+      skin: 'realistic', range: { from: 60, to: 61 }, sizing: { mode: 'fixed' },
+      appearance: { pressedWhite: '#b24030' },
+    } as const;
+    const piano = mount(options);
+    const white = svg().querySelector('[data-note="60"]')!;
+    const black = svg().querySelector('[data-note="61"]')!;
+    const defaultPressed = normalizeConfig({ skin: 'realistic' }).appearance.pressed;
+    piano.pressKey(60);
+    piano.pressKey(61);
+    const fill = (node: Element) => node.getAttribute('fill');
+    const lighting = (node: Element) => node.nextElementSibling?.getAttribute('display');
+    expect([fill(white), fill(black)]).toEqual(['#b24030', defaultPressed]);
+    expect([lighting(white), lighting(black)]).toEqual(['none', 'inline']);
+
+    piano.setOptions({ pressedMode: 'indicator' });
+    expect([fill(white), fill(black)].every(paint => paint?.startsWith('url(#'))).toBe(true);
+    expect([lighting(white), lighting(black)]).toEqual(['inline', 'inline']);
+
+    const appearance = { pressedWhite: '#b24030', pressedBlack: '#306997' };
+    piano.setOptions({ appearance, pressedMode: 'color' });
+    const markup = PianoKeyboard.renderToSVG({ ...options, appearance, pressedMode: 'color', pressedKeys: [60, 61] });
+    const exported = new dom.window.DOMParser().parseFromString(markup, 'image/svg+xml');
+    expect([fill(white), fill(black)]).toEqual(['#b24030', '#306997']);
+    expect(Array.from(exported.querySelectorAll('[data-note]'), fill)).toEqual([fill(white), fill(black)]);
+    expect(svg().querySelector('[data-pressed-indicator][display="inline"]')).toBeNull();
+    const before = svg().outerHTML;
+    expect(() => piano.setOptions({ appearance: { pressedWhite: '#000', pressedBlack: 'red' } })).toThrow();
+    expect(svg().outerHTML).toBe(before);
+
+    piano.setOptions({ appearance: { pressed: '#097', pressedWhite: undefined } });
+    expect([fill(white), fill(black)]).toEqual(['#097', '#306997']);
+    piano.releaseKey(61);
+    expect(fill(black)).toMatch(/^url\(#/);
+    expect(lighting(black)).toBe('inline');
+  });
+
   it('keeps Realistic edge updates local and preserves annotations, geometry and selection when switching skins', () => {
     const piano = mount({
       range: { from: 61, to: 63 }, sizing: { mode: 'fixed' }, skin: 'classic',

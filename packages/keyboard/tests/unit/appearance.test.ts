@@ -13,12 +13,26 @@ describe('appearance resolution', () => {
     expect(Object.isFrozen(lighting.white?.stops[0])).toBe(true);
     const customized = normalizeConfig({ appearance: { white: 'transparent', pressed: '#120' } }, config);
     expect(customized.appearance).toMatchObject({
-      white: 'transparent', pressed: '#120', edgeLighting: { white: undefined, black: lighting.black, pressed: false },
+      white: 'transparent', pressed: '#120',
+      edgeLighting: { white: undefined, black: lighting.black, pressed: { white: false, black: false } },
     });
     expect(normalizeConfig({ appearance: { white: undefined, pressed: undefined } }, customized).appearance)
       .toEqual(config.appearance);
     expect(normalizeConfig({ skin: 'realistic' }).appearance.edgeLighting).toEqual(lighting);
     expect(normalizeConfig({ skin: 'classic' }).appearance.edgeLighting).toBeUndefined();
+  });
+
+  it('resolves per-key pressed paints before the shared color at each override level', () => {
+    const skin = normalizeAppearance({ pressed: '#012', pressedWhite: '#123', pressedBlack: '#234' });
+    expect(resolveAppearance(skin, {})).toMatchObject({
+      pressed: '#012', pressedWhite: '#123', pressedBlack: '#234',
+    });
+    const overrides = normalizeAppearance({ pressed: '#345', pressedBlack: '#456' });
+    const resolved = resolveAppearance(skin, overrides);
+    expect(resolved).toMatchObject({ pressed: '#345', pressedBlack: '#456' });
+    expect(resolved.pressedWhite).toBeUndefined();
+    expect(resolveAppearance(skin, normalizeAppearance({ pressed: undefined }, overrides)))
+      .toMatchObject({ pressed: '#012', pressedWhite: '#123', pressedBlack: '#456' });
   });
 
   it('uses immutable Minimal defaults and deeply frozen Classic definitions', () => {
@@ -77,6 +91,8 @@ describe('appearance resolution', () => {
     [{ white: 'url(https://example.org/paint.svg#paint)' }, TypeError],
     [{ black: 'url(#some-host-paint)' }, TypeError],
     [{ pressed: '#fff" onload="alert(1)' }, TypeError],
+    [{ pressedWhite: 'red' }, TypeError],
+    [{ pressedBlack: 'url(#host)' }, TypeError],
     [{ strokeWidth: '0' }, TypeError],
     [{ strokeWidth: NaN }, RangeError],
     [{ strokeWidth: -0.5 }, RangeError],

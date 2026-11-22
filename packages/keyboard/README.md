@@ -102,7 +102,7 @@ Open [the playground](http://127.0.0.1:5173/demo/) or use the port Vite prints. 
 
 Enter note names or integer MIDI numbers separated by spaces or commas, or try the C major and F♯ minor presets. **Show example annotations** adds a “Do” label, a circle and badge on C4, a highlight and text overlay on E4, and a number on G4. **Indicator only** and **Square** make the pressed state distinguishable by shape. The controls belong to the playground. The piano drawing itself is display-only.
 
-Enable **Override pressed color** and use the **Pressed key color** picker with **Color and indicator** or **Color only**. Clear the checkbox to restore the selected skin's default pressed fill.
+Under **Pressed colors**, choose **Shared color** for one picker or **Separate colors** for white-key and black-key pickers. Preview the fills with **Color and indicator** or **Color only**. Choose **Skin defaults** to clear the overrides.
 
 Copy the mounted or static JavaScript example for the current preview. Each **Download SVG** uses `PianoKeyboard.renderToSVG()` and captures the current diagram at its fixed or measured viewport size. Downloads use distinct prefixes for definition IDs. Static examples and downloads show the final appearance immediately.
 
@@ -207,14 +207,21 @@ Resolution starts with Minimal defaults, applies the selected skin's tokens, and
 | `white`, `black` | Color or `{ stops: [{ offset, color }, ...] }`. A gradient takes 2–8 stops in nondecreasing order, with numeric offsets from 0 through 1. It runs from the rear to the front of each key. An override replaces the entire paint. |
 | `boundary` | Key border color. |
 | `strokeWidth`, `cornerRadius` | Finite nonnegative numbers in SVG user units. Zero disables the corresponding effect. SVG limits the rendered radius to the rectangle's bounds. |
-| `pressed` | Solid pressed-key color for both white and black keys. |
+| `pressed` | Shared solid pressed-key color. |
+| `pressedWhite`, `pressedBlack` | Optional solid pressed colors for each key type. |
 | `blackKeyShadow` | Shadow opacity from 0 through 1. The renderer supplies the offset and blur. Zero disables the shadow. |
 
 Colors accept `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` and `'transparent'`. Unknown names and fields, unsupported paint syntax and malformed tokens throw `TypeError`. Out-of-range numeric tokens throw `RangeError`. The root exports `BuiltInSkin`, `AppearanceOptions`, `AppearanceColor`, `KeyPaint`, `KeyGradient` and `GradientStop`.
 
+A per-key-type instance color takes precedence over the shared instance color. Both instance options take precedence over skin colors, where a per-key-type skin color takes precedence over the shared skin color. Use `undefined` to reset an individual override. The same fields work with mounted instances, registered skins, and static SVG options.
+
+```ts
+piano.setOptions({ appearance: { pressedWhite: '#b24030', pressedBlack: '#307050' } });
+```
+
 Gradient and shadow definitions travel with the SVG and use instance-specific IDs. Static diagrams select a built-in skin and apply inline appearance options. [Generate static SVG](#generate-static-svg)
 
-Realistic uses depth gradients for the keytops and a translucent reflection across the width of each key. The reflection stays visible over the default pressed color and rotates with vertical layouts. An explicit `white` or `black` paint replaces that key type's material finish. An explicit `pressed` color replaces the finish while that color is shown. The lighting scales with the key bounds. Fine bevels and labels can become hard to see when a full keyboard is fitted to a narrow viewport. Set `appearance: { blackKeyShadow: 0 }` to use the gradient and bevel finish without the SVG filter.
+Realistic uses depth gradients for the keytops and a translucent reflection across the width of each key. The reflection stays visible over the default pressed color and rotates with vertical layouts. An explicit `white` or `black` paint replaces that key type's material finish. An explicit pressed color replaces the finish on the keys showing that color. The lighting scales with the key bounds. Fine bevels and labels can become hard to see when a full keyboard is fitted to a narrow viewport. Set `appearance: { blackKeyShadow: 0 }` to use the gradient and bevel finish without the SVG filter.
 
 ## Labels, highlights, and overlays
 

@@ -56,12 +56,13 @@ export function keyPresentation(
   kind: KeyKind, appearance: ResolvedAppearance, pressed: boolean, mode: PressedMode,
 ): KeyPresentation {
   const paint = appearance[kind];
+  const pressedPaint = kind === 'white' ? appearance.pressedWhite : appearance.pressedBlack;
   const usePressedFill = pressed && mode !== 'indicator';
   return {
-    fill: usePressedFill ? appearance.pressed
+    fill: usePressedFill ? pressedPaint ?? appearance.pressed
       : typeof paint === 'string' ? paint : Object.freeze({ slot: gradientSlots[kind] }),
     indicatorDisplay: pressed && mode !== 'color' ? 'inline' : 'none',
-    edgeDisplay: usePressedFill && !appearance.edgeLighting?.pressed ? 'none' : 'inline',
+    edgeDisplay: usePressedFill && !appearance.edgeLighting?.pressed[kind] ? 'none' : 'inline',
   };
 }
 

@@ -144,16 +144,20 @@ def check_playground(driver, directory):
                         'narrow page overflow: ' + viewport.scrollWidth + ' vs ' + viewport.clientWidth);
                     click('highlight-chord');
                     require(active() === 3, 'C major preset');
-                    const c4Fill = () => root().querySelector('[data-note="60"]').getAttribute('fill');
-                    const defaultFill = c4Fill();
-                    require(get('pressed-color').disabled, 'skin color default');
-                    click('override-pressed-color');
-                    const picker = get('pressed-color');
-                    picker.value = '#b24030';
-                    picker.dispatchEvent(new Event('input', {bubbles: true}));
-                    require(!picker.disabled && c4Fill() === '#b24030', 'pressed color preview');
-                    click('override-pressed-color');
-                    require(picker.disabled && c4Fill() === defaultFill, 'restore skin color');
+                    const keyFill = note => root().querySelector(`[data-note="${note}"]`).getAttribute('fill');
+                    const defaultFill = keyFill(60);
+                    const pick = (id, color) => {
+                        const picker = get(id);
+                        require(!picker.parentElement.hidden, 'visible picker: ' + id);
+                        picker.value = color;
+                        picker.dispatchEvent(new Event('input', {bubbles: true}));
+                    };
+                    require(get('pressed-color').parentElement.hidden, 'skin color default');
+                    choose('pressed-color-mode', 'shared');
+                    pick('pressed-color', '#b24030');
+                    require(keyFill(60) === '#b24030', 'shared pressed color');
+                    choose('pressed-color-mode', 'default');
+                    require(get('pressed-color').parentElement.hidden && keyFill(60) === defaultFill, 'restore skin color');
                     click('highlight-f-sharp-minor');
                     require(active() === 3, 'F sharp minor preset');
                     choose('notes', 'C4 128');
@@ -164,7 +168,10 @@ def check_playground(driver, directory):
                     choose('range', 'partial');
                     choose('orientation', 'vertical');
                     choose('skin', 'realistic');
-                    click('override-pressed-color');
+                    choose('pressed-color-mode', 'separate');
+                    pick('pressed-white', '#b24030');
+                    pick('pressed-black', '#307050');
+                    require(keyFill(60) === '#b24030' && keyFill(61) === '#307050', 'separate pressed fills');
                     choose('sizing', 'fixed');
                     choose('width', '120');
                     choose('height', '180');
@@ -182,11 +189,13 @@ def check_playground(driver, directory):
                     require(root().querySelector('rect[data-pressed-indicator][display="inline"]'), 'square indicator');
                     require(root().querySelector('[data-layer="overlays"]'), 'annotations');
                     require(root().querySelector('[data-key-edge]'), 'Realistic finish');
+                    require(keyFill(60).startsWith('url(') && keyFill(61).startsWith('url('), 'indicator-only fill');
+                    choose('pressed-mode', 'both');
                     require(get('example').value.includes('"duration": 170'), 'mounted motion snippet');
                     choose('example-api', 'static');
                     const example = get('example').value;
                     require(example.includes('"skin": "realistic"') && example.includes('"height": 180')
-                        && example.includes('"pressed": "#b24030"')
+                        && example.includes('"pressedWhite": "#b24030"') && example.includes('"pressedBlack": "#307050"')
                         && !example.includes('animation'), 'static config');
                     const exampleScript = document.createElement('script');
                     exampleScript.type = 'module';
@@ -216,6 +225,8 @@ def check_playground(driver, directory):
                             document.documentElement.dataset.exampleSvg, 'image/svg+xml').documentElement;
                         done(window.playgroundErrors.length === 0
                             && sample.getAttribute('height') === '180'
+                            && sample.querySelector('[data-note="60"]').getAttribute('fill') === '#b24030'
+                            && sample.querySelector('[data-note="61"]').getAttribute('fill') === '#307050'
                             && sample.querySelectorAll('[data-pressed-indicator][display="inline"]').length === 2
                             && roots.length === 2 && roots.every(root => root.localName === 'svg'
                             && root.getAttribute('width') === document.querySelector('#horizontal svg').getAttribute('width')
