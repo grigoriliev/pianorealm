@@ -251,7 +251,7 @@ Motion is enabled by default. Minimal and custom skins use 120 ms with `ease-out
 
 Mounted keyboards fade pressed indicators and transition between solid key fills. Classic's gradient-to-color fill changes are immediate, with its indicator still fading. Logical note state and SVG attributes update immediately. The motion stylesheet belongs to the mounted instance, so exported SVG shows the final appearance on its own.
 
-`enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. Anki clients remain unverified.
+`enabled: false` or a zero duration disables motion. Otherwise, the CSS media query enables transitions only when `prefers-reduced-motion: no-preference` matches. Preference changes take effect while mounted without JavaScript media-query listeners. Hosts that lack the CSS media feature show the final appearance immediately, and the JavaScript `matchMedia` API is optional. [Anki client test results](docs/guides/anki-integration.md#compatibility-matrix)
 
 ## Visualization events
 
