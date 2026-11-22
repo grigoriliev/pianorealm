@@ -143,6 +143,22 @@ If your client preserves inline SVG, you can paste the generated string into the
 4. Once media has synced, disconnect the device from the network and repeat local review. Try the static example on each client, including any surface that blocks scripts. For AnkiWeb, test connected static display and keep that result separate from offline native review.
 5. When blank, first check that both exact filenames are in the active profile and present on the reviewing device. If the helper loaded, its status element can show invalid chord data or bundle-loading errors. If scripts are blocked, even the status element may stay empty. Inspect the client's console when available for media path, syntax, CSP or namespace errors. Confirm that the horizontal host has a nonzero width and height, and look for duplicate script initialization or an existing mount on the same element.
 
+## Run the clean-profile Desktop test
+
+The repository test drives the real Anki Desktop dialogs and reviewer offscreen. Use Linux with Python 3, Node and npm, `ip` from iproute2, and `unshare` from util-linux. The host must let your user create a user and network namespace and enable loopback inside it. Extract the official Anki Desktop 26.09.3 Linux release. Keep the executable next to its bundled `python/` and `app_packages/` directories. The test uses that release's Desktop automation interfaces. [Anki 26.09.3 downloads](https://github.com/ankitects/anki/releases/tag/26.09.3)
+
+From `packages/keyboard`, run:
+
+```sh
+npm ci
+npm run build
+python3 tests/anki/run.py --anki "/path/to/extracted/anki" --report /tmp/pianorealm-anki-results.jsonl
+```
+
+The runner creates and removes a temporary profile and serves local media over loopback in a namespace with no external routes. It needs no Anki account or running desktop session. It reads the HTML templates, styling, customization, and SVG example from this guide. The test checks setup through **Manage Note Types**, **Fields**, **Cards**, and **Add**, then exercises preview, review, resizing, night mode, static SVG, and bad-input and missing-media diagnostics.
+
+A successful run prints `PASS` and exits with status 0. The optional `--report` argument saves the client version and observations as JSON Lines. If Anki fails to start or a check fails, the runner exits nonzero and prints Anki's log. If `unshare` or `ip link set lo up` fails with a permission error, use a Linux environment that supports user network namespaces for this test.
+
 ## Compatibility matrix
 
 The Linux result comes from an automated run of the actual Anki Desktop application on 2026-11-22. The temporary profile used the templates above and copied media directly into `collection.media`. Anki ran offscreen with only loopback networking for its local media server. Sync and other Anki versions remain untested. [Anki 26.09.3 release](https://github.com/ankitects/anki/releases/tag/26.09.3) · [Test evidence](../../PROJECT_STATE.md#anki-desktop-checklist)

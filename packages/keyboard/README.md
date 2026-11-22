@@ -22,6 +22,8 @@ node --input-type=module -e 'import { normalizeNote } from "@pianorealm/keyboard
 
 To repeat the offline smoke test with Python 3 and Firefox, run `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 python3 tests/artifacts/firefox-offline.py`. It creates a temporary Firefox profile and uses loopback for browser automation. Firefox loads the fixture and both scripts from local files with its network service offline.
 
+To run the guide's templates in Anki Desktop on Linux, use the [clean-profile Desktop test](docs/guides/anki-integration.md#run-the-clean-profile-desktop-test).
+
 ## Generate static SVG
 
 ```ts

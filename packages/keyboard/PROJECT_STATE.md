@@ -45,6 +45,8 @@ The clean-profile developer walkthrough also passed on the same Desktop client. 
 
 Media sync and other Anki clients, versions, and platforms remain unverified. Assistive technologies and the Node 22 development baseline remain untested in this phase. Phase 9 stays in progress for the remaining client coverage. [Compatibility matrix](docs/guides/anki-integration.md#compatibility-matrix)
 
+The clean-profile walkthrough is reproducible from `tests/anki/`. From `packages/keyboard`, `npm run build && python3 tests/anki/run.py --anki /tmp/pianorealm-anki26/anki-26.9.3-linux-x86_64.tar/anki --report /tmp/pianorealm-repo-anki-results.jsonl` exited 0. The repository runner created its own temporary profile, used the guide's examples, and reported `PASS` on the same Anki Desktop and WebView versions. [Runner prerequisites and commands](docs/guides/anki-integration.md#run-the-clean-profile-desktop-test)
+
 ## Phase 8 handoff
 
 The [Phase 8 gate](prompts/01-implementation/phase-08-events-hit-testing-extensions.md#11-completion-gate) was reverified for handoff on 2026-11-22 at HEAD `012cf39` with the Phase 8 working-tree changes. Phase 7 is tracked in `00d4db0`. Resume with the full working tree, including the untracked `src/public/events.ts`. The pre-existing untracked package `.gitignore` is separate from Phase 8.
