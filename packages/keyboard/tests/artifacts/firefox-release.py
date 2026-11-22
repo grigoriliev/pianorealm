@@ -144,6 +144,16 @@ def check_playground(driver, directory):
                         'narrow page overflow: ' + viewport.scrollWidth + ' vs ' + viewport.clientWidth);
                     click('highlight-chord');
                     require(active() === 3, 'C major preset');
+                    const c4Fill = () => root().querySelector('[data-note="60"]').getAttribute('fill');
+                    const defaultFill = c4Fill();
+                    require(get('pressed-color').disabled, 'skin color default');
+                    click('override-pressed-color');
+                    const picker = get('pressed-color');
+                    picker.value = '#b24030';
+                    picker.dispatchEvent(new Event('input', {bubbles: true}));
+                    require(!picker.disabled && c4Fill() === '#b24030', 'pressed color preview');
+                    click('override-pressed-color');
+                    require(picker.disabled && c4Fill() === defaultFill, 'restore skin color');
                     click('highlight-f-sharp-minor');
                     require(active() === 3, 'F sharp minor preset');
                     choose('notes', 'C4 128');
@@ -154,6 +164,7 @@ def check_playground(driver, directory):
                     choose('range', 'partial');
                     choose('orientation', 'vertical');
                     choose('skin', 'realistic');
+                    click('override-pressed-color');
                     choose('sizing', 'fixed');
                     choose('width', '120');
                     choose('height', '180');
@@ -175,6 +186,7 @@ def check_playground(driver, directory):
                     choose('example-api', 'static');
                     const example = get('example').value;
                     require(example.includes('"skin": "realistic"') && example.includes('"height": 180')
+                        && example.includes('"pressed": "#b24030"')
                         && !example.includes('animation'), 'static config');
                     const exampleScript = document.createElement('script');
                     exampleScript.type = 'module';

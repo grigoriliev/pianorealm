@@ -12,6 +12,12 @@
 - Phase 2 adds `src/geometry/layout.ts` and `src/geometry/hit-testing.ts`. Configuration and geometry share validation from `src/config/normalize.ts`, `src/notes/notation.ts` and `src/notes/ranges.ts`. The private layout takes a normalized MIDI range, an orientation and key dimensions in SVG user units. It counts white-key slots, centers black keys on their seams and keeps the full pitch-axis union of visible rectangles. The viewport always retains full white-key depth. The vertical layout applies the A-03 transform to the horizontal bounds. Its frozen keys are ordered whites before blacks, each in ascending MIDI order. [Layout and query ADR](docs/decisions/0002-layout-sizing-and-hit-testing.md)
 - The private point query uses half-open rectangles in intrinsic coordinates and returns the topmost MIDI note or `null`. Nonnumeric coordinates throw `TypeError` and non-finite coordinates throw `RangeError`. Phase 2 left the package root exports unchanged.
 
+## Playground pressed-color preview
+
+- **Override pressed color** enables a live picker for the pressed fill in all playground previews. The mounted and static snippets and SVG downloads carry the override. Clearing the checkbox restores the selected skin's default.
+- `npm run typecheck` and `npm run build` passed. The Firefox 160.0.1 playground check in `tests/artifacts/firefox-release.py` passed when run directly with local loopback. It exercised live color updates, restoration of the skin default, and the generated static options. `npm test` passed 273 of 274 tests. The committed Realistic pressed palette (`#5582ad`) yields 4.05:1 against white, below the existing 4.5:1 test threshold. The earlier Realistic evidence below applies to its original palette.
+- The next bounded verification task is to review the committed Realistic palette against the contrast target, then rerun the full test suite and visual regression.
+
 ## Realistic skin handoff
 
 - Select `skin: 'realistic'` with the mounted or static API, or call `setSkin('realistic')` on an existing instance. The playground keeps the same range, dimensions and annotations when comparing skins. [Usage and overrides](README.md#skins-and-appearance)

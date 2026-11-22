@@ -102,6 +102,8 @@ Open [the playground](http://127.0.0.1:5173/demo/) or use the port Vite prints. 
 
 Enter note names or integer MIDI numbers separated by spaces or commas, or try the C major and F♯ minor presets. **Show example annotations** adds a “Do” label, a circle and badge on C4, a highlight and text overlay on E4, and a number on G4. **Indicator only** and **Square** make the pressed state distinguishable by shape. The controls belong to the playground. The piano drawing itself is display-only.
 
+Enable **Override pressed color** and use the **Pressed key color** picker with **Color and indicator** or **Color only**. Clear the checkbox to restore the selected skin's default pressed fill.
+
 Copy the mounted or static JavaScript example for the current preview. Each **Download SVG** uses `PianoKeyboard.renderToSVG()` and captures the current diagram at its fixed or measured viewport size. Downloads use distinct prefixes for definition IDs. Static examples and downloads show the final appearance immediately.
 
 The playground uses the public source entry point. The production bundle contains only library code.

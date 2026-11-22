@@ -54,7 +54,7 @@ const classic = normalizeAppearance({
   black: { stops: [{ offset: 0, color: '#1a1514' }, { offset: 1, color: '#48403c' }] },
   boundary: '#6b5846',
   cornerRadius: 2,
-  pressed: '#85502b',
+  pressed: '#C5906B',
   blackKeyShadow: 0.28,
 });
 

@@ -36,6 +36,7 @@ const copyStatus = find('#copy-status');
 const sizing = find<HTMLSelectElement>('#sizing');
 const width = find<HTMLInputElement>('#width');
 const height = find<HTMLInputElement>('#height');
+const pressedColor = find<HTMLInputElement>('#pressed-color');
 const preview = find('#horizontal .keyboard-host');
 const samples = [
   { name: 'horizontal', container: preview },
@@ -109,6 +110,7 @@ function optionalNumber(input: HTMLInputElement): number | undefined {
 function apply(): void {
   const mode = sizing.value as NonNullable<SizingOptions['mode']>;
   width.disabled = height.disabled = mode !== 'fixed';
+  pressedColor.disabled = !checked('#override-pressed-color');
   let selection: number[];
   try {
     selection = notes.value.trim().split(/[\s,]+/).filter(Boolean)
@@ -134,6 +136,7 @@ function apply(): void {
       appearance: {
         background: checked('#transparent-background') ? 'transparent' : undefined,
         strokeWidth: checked('#hide-borders') ? 0 : undefined,
+        pressed: pressedColor.disabled ? undefined : pressedColor.value,
       },
       animation: { enabled: checked('#animate-highlights'), duration: optionalNumber(find('#duration')) },
       labels: {
@@ -166,6 +169,7 @@ form.addEventListener('submit', event => {
   apply();
 });
 form.addEventListener('change', apply);
+pressedColor.addEventListener('input', apply);
 for (const [id, chord] of [
   ['highlight-chord', 'C4, E4, G4'],
   ['highlight-f-sharp-minor', 'F#3, A3, C#4'],
